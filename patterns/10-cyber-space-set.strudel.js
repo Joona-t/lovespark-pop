@@ -20,19 +20,21 @@ samples({ br_mc1: ['mc1__s42.wav'], br_mc2: ['mc2c__s42.wav'], br_crowd: ['crowd
 const A = "<Fm9 Db^7 Ab^7 Eb>", Aroots = "<f1 db1 ab0 eb1>"
 const B = "<Db^7 Eb Fm9 Cm7 Db^7 Eb Ab^7 C7>", Broots = "<db1 eb1 f1 c1 db1 eb1 ab0 c1>"
 
-// drums (orbit 1); the kick ducks the music bus (orbit 2) like a sidechain compressor
+// buses: kick (orbit 9), other drums (1), bass and sub (8), music (2), lead (3), chops (4), distant vocal (5), the line (6), announcer (7).
+// The kick ducks the music and bass buses like a sidechain compressor; each bus is captured as a stem for the mix.
 const kick = s("bd*4").bank("RolandTR909").shape(.25).mask("<1!7 [1 1 1 0]>").gain(1.05)
-  .duckorbit(2).duckattack(.18).duckdepth(.85)
+  .orbit(9).duckorbit("2:8").duckattack(.18).duckdepth(.85)
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.25).gain(.6)
 const fill = s("<~!7 [~ ~ cp*4 cp*8]>").bank("RolandTR909").gain(.5)
-const hats = s("hh*8").bank("RolandTR909").swingBy(1/6, 4).gain("[.25 .5]*4")
+// closed hats sit behind the groove: short, high-passed, quiet, off-beat accent (Joona: "sounds like a metronome")
+const hats = s("hh*8").bank("RolandTR909").swingBy(1/6, 4).hpf(7500).decay(.04).sustain(0).gain("[.06 .2]*4").pan(.45).room(.12)
 const open = s("[~ oh]*4").bank("RolandTR909").gain(.35)
-const rim = s("~ ~ ~ ~ ~ ~ ~ rim").bank("RolandTR909").gain(.4)
+const rim = s("~ ~ ~ ~ ~ ~ ~ rim").bank("RolandTR909").hpf(600).room(.3).gain(.16)
 const drums = stack(kick, clap, fill, hats, open)
 const halfTime = stack(
-  s("bd ~ ~ ~ ~ ~ ~ [~ bd]").bank("RolandTR909").shape(.25).gain(1.05).duckorbit(2).duckattack(.3).duckdepth(.7),
+  s("bd ~ ~ ~ ~ ~ ~ [~ bd]").bank("RolandTR909").shape(.25).gain(1.05).orbit(9).duckorbit("2:8").duckattack(.3).duckdepth(.7),
   s("~ ~ ~ ~ cp ~ ~ ~").bank("RolandTR909").room(.5).gain(.7),
-  s("hh*4").bank("RolandTR909").gain(.25))
+  s("hh*4").bank("RolandTR909").hpf(7500).decay(.04).sustain(0).gain(.1))
 const riser = s("white*16").decay(.08).sustain(0)
   .lpf(saw.range(400, 9000).slow(8)).gain(saw.range(0, .28).slow(8))
 const roll = s("sd*<4 4 8 8 16 16 [16 32] 32>").bank("RolandTR909").gain(saw.range(.15, .7).slow(8))
@@ -40,8 +42,8 @@ const roll = s("sd*<4 4 8 8 16 16 [16 32] 32>").bank("RolandTR909").gain(saw.ran
 // music bus (orbit 2)
 const bass = (roots) => stack(
   note(roots).struct("[~ x x x]*4").s("sawtooth").lpf(420).lpenv(1.3).lpdecay(.1).lpq(2).decay(.14).sustain(0).gain(.6),   // round, not squelchy
-  note(roots).s("sine").gain(.5)).orbit(2)
-const sub = (roots) => note(roots).s("sine").gain(.6).orbit(2)
+  note(roots).s("sine").gain(.5)).orbit(8)
+const sub = (roots) => note(roots).s("sine").gain(.6).orbit(8)
 const plucks = (lo, hi) => chord(A).voicing().struct("x*16").s("sawtooth").detune(.25)
   .lpf(700).lpenv(saw.range(lo, hi).slow(8)).lpdecay(.1).lpq(7)
   .decay(.14).sustain(0).room(.4).delay(.2).delaytime(3/16).gain(.55).orbit(2)
@@ -94,8 +96,8 @@ const announce = stack(
 // Kept from it: only the ear-to-ear drift of the plucks in the outro.
 arrange(
   [12, announce],
-  [8,  stack(plucks(.5, 2), hats.gain(.3), silence)],
-  [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
+  [8,  stack(plucks(.5, 2), silence)],                                               // no hats alone over the plucks
+  [8,  stack(plucks(2, 3.5), far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],
   [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven.mask("<0!8 1!8>"))],
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],
@@ -104,5 +106,5 @@ arrange(
   [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],
   [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],
   [8,  stack(kick, hats, bass(Aroots), plucks(4, 2).pan(sine.range(.25, .75).slow(2)), far("<[sultry_six ~ ~ ~ sultry_seven ~ ~ ~] ~ ~ ~ ~ ~ ~ ~>"))],
-  [8,  stack(hats.gain(.3), plucks(2, .3).pan(sine.range(.06, .94).slow(2)), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>"))],
+  [8,  stack(plucks(2, .3).pan(sine.range(.06, .94).slow(2)), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>"))],
 )

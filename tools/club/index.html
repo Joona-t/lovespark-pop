@@ -200,7 +200,9 @@ CLAUDIOS.forEach(([variant, x, y, z, w, ry, surf], i) => {
   const anchor = new THREE.Group(); anchor.position.set(x, y, z); anchor.rotation.y = ry; scene.add(anchor);
   const holder = new THREE.Group(); anchor.add(holder);
   const standIn = makeClaudio(); standIn.scale.setScalar(w / 2.2); holder.add(standIn);
-  const c = { anchor, holder, baseX: x, baseY: y, w, surf: !!surf, vrm: null, variant, i }; claudios.push(c);
+  const c = { anchor, holder, baseX: x, baseY: y, baseZ: z, baseRy: ry, w, surf: !!surf, vrm: null, variant, i,
+    rider: variant === 'classic' ? 'right' : variant === 'shades' ? 'left' : null };   // classic sits on her right (viewer's left), shades on her left
+  claudios.push(c);
   claudioLoader.load(`/models/claudio/Claudio-${variant}.vrm`, (gltf) => {
     const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); vrm.scene.traverse((o) => { o.frustumCulled = false; });
     const box = new THREE.Box3().setFromObject(vrm.scene), size = box.getSize(new THREE.Vector3()), k = w / Math.max(size.x, .001);
@@ -337,7 +339,7 @@ const crowdBlue = new THREE.DirectionalLight(0x3f7bff, .9); crowdBlue.position.s
 const key = new THREE.SpotLight(0xffe2d0, 14, 12, .42, .7, 1.2); key.position.set(.6, 3.6, 4.2); key.target.position.set(0, 1.3, 0); scene.add(key, key.target);
 const spots = [[PINK, -4.5], [CYAN, 4.5], [PINK, 2], [CYAN, -2]].map(([c, x]) => { const s = new THREE.SpotLight(c, 0, 16, .42, .7, 1); s.position.set(x, 5.2, -1.5); scene.add(s, s.target); return s; });
 const wash = new THREE.PointLight(PINK, 0, 14, 1.4); wash.position.set(0, 3.2, -3.4); scene.add(wash);
-const strobe = new THREE.PointLight(0xffffff, 0, 20, 1); strobe.position.set(0, 4.5, 1); scene.add(strobe);
+const strobe = new THREE.PointLight(0xffffff, 0, 20, 1); strobe.position.set(0, 4.6, -2.6);   // over the crowd, not over the DJ: her white outfit blew out under it scene.add(strobe);
 
 // ---------- the DJ (Lime) and the announcer (MC Spark) ----------
 // Their models glow on their own (emissive hair, LEDs); under club lights that washes out, so emissive and base colour are scaled down on load.
@@ -374,26 +376,97 @@ function poseMC(bar, sec, pulse, dt) {
 }
 const tune = { raise: 2.2, upperZ: -1.12, upperX: .35, lowerY: 1.25, lowerZ: .0, hand: .2 };       // arm pose, tuned by eye on this model
 new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/lime.vrm', (gltf) => {
-  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); tame(vrm);
-  vrm.scene.position.set(0, 0, -.05); scene.add(vrm.scene); ash = vrm; window.club.vrm = vrm;
+  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); tame(vrm, .18, .56);   // her outfit is white: dimmed further so the drop lights colour it without blowing it out
+  vrm.scene.position.set(0, 0, .1); scene.add(vrm.scene); ash = vrm;   // close enough to the booth for her hands to reach the decks window.club.vrm = vrm;
 }, undefined, (e) => console.error('ashley model failed to load', e));
+// ---------- the "six, seven" emote (Joona, 2026-11-19): palms up, hands going up and down in turn ----------
+// On each bar where the voice says "six, seven": Ash does it, the two booth Claudios jump onto her hands and ride them,
+// and every other Claudio rocks side to side with it. Bars are 0-based and come from the set's vocal pattern.
+const SIXSEVEN = [44, 60, 68, 100, 108, 116];
+const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+function emoteAt(bar) {                               // e: how far into the pose (0..1); j: riders' jump (0 on the booth, 1 on her hands); alt: +1 her left hand up ("six"), -1 her right ("seven")
+  for (const b of SIXSEVEN) { const t = bar - b;
+    if (t >= -.5 && t < 2.5) return { on: true, t, e: smooth((t + .5) / .3) * (1 - smooth((t - 2) / .25)), j: smooth((t + .4) / .4) * (1 - smooth((t - 2.05) / .4)), alt: Math.cos(t * Math.PI * 2) * smooth((t + .1) / .2) }; }
+  return { on: false, t: 0, e: 0, j: 0, alt: 0 };
+}
+const handPos = { left: new THREE.Vector3(), right: new THREE.Vector3() }, _elbow = new THREE.Vector3();
+// Arms are posed by direction, not by guessed joint angles (which looked broken: Joona, 2026-11-19). Each bone turns the
+// shortest way from its T-pose direction (straight out to the side) to where the elbow or the hand should go, so an elbow
+// always bends like an elbow. Directions are [out to her side, up, forward] and mirror for the other arm.
+const POSE = {
+  deckU: [.30, -.84, .40], deckL: [-.16, -.16, 1],            // hands on the decks
+  pumpU: [.34, .78, .30], pumpLo: [-.12, .55, .75], pumpHi: [.04, 1, .12],   // fist in the air: bent, then punched up on the beat
+  waveU: [.55, .62, .22],                                      // open-hand wave to the crowd
+  emoU: [.42, -.45, .6], emoL: [.32, .6, 1], emoSwing: .42, emoTwist: 1.5,   // six-seven: forearms out, palms up, hands taking turns
+};
+const _rest = new THREE.Vector3(), _d = new THREE.Vector3(), _qi = new THREE.Quaternion(), _tw = new THREE.Quaternion();
+const lerp3 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
+function aimArm(bone, side, upper, lower, twist = 0) {
+  const s = side === 'left' ? 1 : -1, U = bone(side + 'UpperArm'), L = bone(side + 'LowerArm');
+  if (!U || !L) return;
+  _rest.set(s, 0, 0);
+  U.quaternion.setFromUnitVectors(_rest, _d.set(s * upper[0], upper[1], upper[2]).normalize());
+  _qi.copy(U.quaternion).invert();
+  L.quaternion.setFromUnitVectors(_rest, _d.set(s * lower[0], lower[1], lower[2]).normalize().applyQuaternion(_qi));
+  if (twist) L.quaternion.multiply(_tw.setFromAxisAngle(_rest, twist));
+}
+const FINGERS = ['Index', 'Middle', 'Ring', 'Little'], JOINTS = ['Proximal', 'Intermediate', 'Distal'];
+function curl(bone, side, amount) {                   // 0 open hand, 1 fist
+  const s = side === 'left' ? 1 : -1;
+  for (const f of FINGERS) for (const j of JOINTS) bone(side + f + j)?.rotation.set(0, 0, -s * 1.25 * amount);
+  bone(side + 'ThumbProximal')?.rotation.set(0, s * .6 * amount, 0); bone(side + 'ThumbDistal')?.rotation.set(0, s * .7 * amount, 0);
+}
+// when each arm pumps: both on the first bar of a drop; then right, left in turn on bars 2 and 4 of every four; once per four in the grooves
+function pumpAt(bar, sec) {
+  const [start, name, energy] = sec, f = bar % 1, k = Math.floor(bar - start) % 4, env = smooth(f / .12) * (1 - smooth((f - .86) / .12));
+  const hot = name === 'drop' || name === 'final';
+  let L = 0, R = 0;
+  if (hot && bar - start < 1) L = R = env;
+  else if (hot) { if (k === 1) R = env; if (k === 3) L = env; }
+  else if (energy >= .7 && k === 3) R = env;
+  return { L, R };
+}
 function poseAsh(bar, sec, pulse, dt) {
   if (!ash) return;
+  const emo = emoteAt(bar), pump = pumpAt(bar, sec);
   const h = ash.humanoid, b = (n) => h.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
-  const sway = Math.sin(beat * Math.PI / 2), handsUp = (name === 'drop' || name === 'final') && (Math.floor(bar) % 4 === 3) ? 1 : (name === 'announce' ? .75 + .25 * Math.sin(beat * Math.PI) : 0);
+  const sway = Math.sin(beat * Math.PI / 2), wave = name === 'announce' ? 1 : 0;
   b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * energy) * pulse;
   b('spine').rotation.set(.06 + .04 * pulse * energy, sway * .07 * (.4 + energy), sway * .035);
   b('chest').rotation.set(.03, sway * .05, 0);
   b('neck').rotation.set(.05 + .11 * pulse * (.4 + energy), 0, sway * .03);
   b('head').rotation.set(.02 + .07 * pulse * energy, sway * .1, 0);
+  const punch = .5 + .5 * Math.cos(beat * Math.PI * 2);                                    // 1 on every beat: the fist is highest on the kick
   for (const side of ['left', 'right']) {
-    const s = side === 'left' ? 1 : -1, up = side === 'right' ? handsUp : handsUp * .0;
-    b(side + 'UpperArm').rotation.set(tune.upperX * (1 - up), 0, s * (tune.upperZ * (1 - up) + tune.raise * up));
-    b(side + 'LowerArm').rotation.set(0, s * tune.lowerY * (1 - up * .7), s * tune.lowerZ);
-    b(side + 'Hand').rotation.set(0, 0, s * tune.hand + (side === 'left' ? Math.sin(beat * Math.PI) * .12 : 0));
+    const p = side === 'left' ? pump.L : pump.R, w = side === 'right' ? wave : 0, a = (side === 'left' ? 1 : -1) * emo.alt;
+    const nudge = side === 'left' ? Math.sin(beat * Math.PI) * .05 : 0;                     // her left hand rides the fader
+    let U = POSE.deckU, L = [POSE.deckL[0] + nudge, POSE.deckL[1], POSE.deckL[2]];
+    U = lerp3(U, POSE.pumpU, p); L = lerp3(L, lerp3(POSE.pumpLo, POSE.pumpHi, punch), p);
+    U = lerp3(U, POSE.waveU, w); L = lerp3(L, [.25 + .45 * Math.sin(beat * Math.PI), 1, .2], w);
+    U = lerp3(U, POSE.emoU, emo.e); L = lerp3(L, [POSE.emoL[0], POSE.emoL[1] + a * POSE.emoSwing, POSE.emoL[2]], emo.e);
+    aimArm(b, side, U, L, (side === 'left' ? 1 : -1) * POSE.emoTwist * emo.e);
+    b(side + 'Hand')?.rotation.set(POSE.emoTwist * emo.e, 0, 0);                          // the rest of the turn to palm-up happens at the wrist
+    curl(b, side, Math.max(p, .18 * (1 - w)) * (1 - emo.e));
   }
+  ash.expressionManager?.setValue('happy', Math.max(emo.e * .8, Math.max(pump.L, pump.R) * .5));
   if (!settled) { ash.springBoneManager?.reset(); settled = true; }   // hair starts from the posed body, not the T-pose
   ash.update(dt);
+  ash.scene.updateMatrixWorld(true);
+  for (const side of ['left', 'right']) {                                                  // the palm: a little past the wrist, along the forearm
+    (h.getRawBoneNode(side + 'Hand') || b(side + 'Hand')).getWorldPosition(handPos[side]);
+    (h.getRawBoneNode(side + 'LowerArm') || b(side + 'LowerArm')).getWorldPosition(_elbow);
+    handPos[side].addScaledVector(_elbow.subVectors(handPos[side], _elbow).normalize(), .075);
+  }
+}
+// the two booth Claudios: a hop from the booth onto her open hands, a ride, and a hop back
+function poseRiders(bar) {
+  const emo = emoteAt(bar);
+  for (const c of claudios) { if (!c.rider) continue;
+    const hp = handPos[c.rider], j = ash ? emo.j : 0, k = 1 - .3 * j;
+    c.anchor.position.set(c.baseX + (hp.x - c.baseX) * j, c.anchor.position.y + (hp.y + .035 - c.anchor.position.y) * j + Math.sin(Math.PI * j) * .32, c.baseZ + (hp.z + .02 - c.baseZ) * j);
+    c.anchor.rotation.y = c.baseRy * (1 - j) + Math.sin(Math.PI * j) * (c.rider === 'left' ? -1 : 1) * 1.2;      // a half spin in the air
+    c.anchor.scale.setScalar(k);
+  }
 }
 
 // ---------- camera: a few fixed angles, cut on bar lines, slight handheld drift ----------
@@ -404,10 +477,12 @@ const SHOTS = [
   { p: [3.7, 1.9, 2.4], t: [0, 1.2, -.6] },          // 3 side, booth and crowd
   { p: [0, 3.1, 4.0], t: [0, 1.25, -1.2] },           // 4 high, the whole room
   { p: [1.6, 1.36, 1.95], t: [1.05, 1.2, .8] },
-  { p: [-.75, 1.5, 3.9], t: [-1.3, 1.36, 1.7] },      // 6 the announcer      // 5 little Claudio on the mixer
+  { p: [-.75, 1.5, 3.9], t: [-1.3, 1.36, 1.7] },      // 6 the announcer
+  { p: [0, 1.5, 2.9], t: [0, 1.3, .15] },            // 7 the six-seven emote: Ash, her hands and the booth      // 5 little Claudio on the mixer
 ];
 function shotAt(bar, sec) {
   const [start, name, energy] = sec;
+  if (emoteAt(bar).on) return 7;
   if (name === 'announce') return bar < 2.5 ? 0 : (bar < 4.4 ? 6 : (bar < 5.2 ? 4 : (bar < 9.6 ? 6 : 0)));
   if (name === 'introA') return 0;
   const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
@@ -432,22 +507,25 @@ function frame(bar, dt) {
   platters.forEach((p, i) => { p.rotation.y = -bar * Math.PI * 2 * 1.11 * (i ? 1 : .98); });
   leds.forEach((l, i) => { l.visible = (i / 10) < (.25 + pulse * .8 * (.4 + energy)); });
   stacks.forEach((s) => { s.userData['cone0.26'].position.z = .36 + pulse * .035 * energy; s.userData['cone0.17'].position.z = .36 + pulse * .015; });
+  const emo = emoteAt(bar);
   claudios.forEach((c, i) => {                       // squash on the kick, hop after it, wobble; blink now and then, surprised when a drop hits
     const hop = Math.abs(Math.sin(beat * Math.PI + i * .4)) * (.02 + .1 * energy) * c.w * 1.6;
     const sq = 1 - .16 * pulse * (.4 + energy);
     c.holder.scale.set(1 + (1 - sq) * .6, sq, 1 + (1 - sq) * .6);
     c.anchor.position.y = c.baseY + hop + (c.surf ? Math.sin(beat * Math.PI) * .06 : 0);
     if (c.surf) { c.anchor.position.x = Math.sin(bar * .45) * 2.6; c.anchor.visible = energy >= .5; c.anchor.rotation.y = Math.sin(bar * .45 + 1.2) * .5; }
-    c.holder.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .07 * (.3 + energy);
+    const turn = (i % 2 ? 1 : -1) * emo.alt * emo.e;                                       // neighbours take turns, like her hands
+    c.holder.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .07 * (.3 + energy) * (1 - emo.e) + (c.rider ? 0 : turn * .34);
+    if (!c.rider) c.anchor.position.y += Math.max(0, turn) * .22 * c.w;
     const em = c.vrm?.expressionManager;
     if (em) {
       const blinkPh = (bar * 1.3 + i * .37) % 1;
       em.setValue('blink', blinkPh < .04 ? 1 : 0);
-      em.setValue('surprised', (name === 'drop' || name === 'final') && bar - start < 1 ? 1 : 0);
+      em.setValue('surprised', ((name === 'drop' || name === 'final') && bar - start < 1) || (c.rider && emo.j > .02 && emo.j < .98) ? 1 : 0);
       c.vrm.update(dt);
     }
   });
-  poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseMC(bar, sec, pulse, dt);
+  poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseRiders(bar); poseMC(bar, sec, pulse, dt);
   spots.forEach((s, i) => {
     s.intensity = (5 + 9 * energy) * (.55 + .45 * pulse) * (name === 'introA' ? .3 : 1);
     const a = bar * (.5 + i * .13) + i * 1.7; s.target.position.set(Math.sin(a) * 4.2, .8, -2.6 + Math.cos(a * .7) * 2.2); s.target.updateMatrixWorld();
@@ -455,7 +533,7 @@ function frame(bar, dt) {
   wash.intensity = 2 + 4 * energy * (.4 + .6 * pulse); wash.color.setHex(Math.floor(bar / 4) % 2 ? CYAN : PINK);
   const drop = (name === 'drop' || name === 'final') && bar - start < 2;                 // strobe through the first 2 bars of a drop
   const rollHit = build > .5 ? ((beat * (build > .75 ? 4 : 2)) % 1 < .25 ? 1 : 0) * (build - .5) * 2 : 0;
-  strobe.intensity = drop ? ((beat * 4) % 1 < .35 ? 9 : 0) : rollHit * 4;
+  strobe.intensity = drop ? ((beat * 4) % 1 < .35 ? 7 : 0) : rollHit * 3.5;
   key.intensity = 3.2 + 1 * energy;
   signs.forEach(({ m, l, i }) => {                       // a slow breathing glow, a kick of brightness on the beat, a rare flicker
     const flick = rand(Math.floor(bar * 16) + i * 77) > .985 ? .35 : 1, g = (.82 + .18 * Math.sin(bar * 1.3 + i * 1.7)) * (.85 + .25 * pulse * energy) * flick;
@@ -486,16 +564,52 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }
-window.club = { still, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
+window.club = { still, POSE, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
   resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
 if (fake) document.getElementById('go').remove();
 document.getElementById('start')?.addEventListener('click', async () => {
   const btn = document.getElementById('start'); btn.textContent = 'LOADING…';
   const code = await (await fetch(TRACK)).text();
   await Promise.all(['mc/mc1__s42.wav', 'mc/mc2c__s42.wav', 'mc/crowd.wav'].map((f) => fetch('/samples/' + f).then((r) => r.arrayBuffer()).catch(() => 0)));
-  const m = ed.editor; m.setCode(code); await m.evaluate();
+  const m = ed.editor, stemName = params.get('stems');
+  const attach = stemName ? await captureStems(stemName, getAudioContext()) : null;
+  m.setCode(code); await m.evaluate();
+  if (attach) attach();
+  else getSuperdoughAudioController().output.destinationGain.gain.value = .56;   // the layers sum to +4.5 dBFS (measured from stems): -5 dB keeps the live output from clipping
   sched = m.repl.scheduler; fake = null; document.getElementById('go').remove();
+  if (stemName) { const t = setInterval(() => { if (sched.now() >= BARS + 1.6) { clearInterval(t); window.club.stems.stop().then(() => m.stop?.()); } }, 400); }
 });
+// ---------- stem capture (?stems=name): every bus recorded separately and sample-aligned, in one silent pass ----------
+// One worklet takes all buses as channels of a single stream, so the stems cannot drift apart; pieces are appended to
+// renders/<name>.f32 (raw 32-bit float). The speakers are disconnected while it runs.
+const STEMS = [['master', null, 2], ['kick', 9, 1], ['drums', 1, 2], ['bass', 8, 1], ['music', 2, 2], ['lead', 3, 2], ['chops', 4, 2], ['far', 5, 2], ['line', 6, 2], ['mc', 7, 2]];
+async function captureStems(name, ctx) {
+  const total = STEMS.reduce((a, x) => a + x[2], 0), st = window.club.stems = { name, channels: total, rate: ctx.sampleRate, frames: 0, sent: 0, state: 'recording', layout: STEMS.map(([n, , c]) => n + ':' + c).join(' ') };
+  const src = `class Cap extends AudioWorkletProcessor { constructor(o) { super(); this.n = o.processorOptions.n; this.buf = new Float32Array(this.n * 128 * 96); this.w = 0; }
+    process(inputs) { const inp = inputs[0]; for (let i = 0; i < 128; i++) for (let c = 0; c < this.n; c++) this.buf[this.w++] = inp[c] ? inp[c][i] : 0;
+      if (this.w >= this.buf.length) { this.port.postMessage(this.buf, [this.buf.buffer]); this.buf = new Float32Array(this.n * 128 * 96); this.w = 0; } return true; } }
+    registerProcessor('cap', Cap);`;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  return () => {                                     // call right after the audio graph exists
+    const c = getSuperdoughAudioController(), merger = ctx.createChannelMerger(total);
+    const node = new AudioWorkletNode(ctx, 'cap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: total, channelCountMode: 'explicit', channelInterpretation: 'discrete', processorOptions: { n: total } });
+    const sink = ctx.createGain(); sink.gain.value = 0; merger.connect(node); node.connect(sink).connect(ctx.destination);
+    let ch = 0;
+    for (const [, orbit, n] of STEMS) {
+      const out = orbit == null ? c.output.destinationGain : c.getOrbit(orbit).output;
+      if (n === 2) { const sp = ctx.createChannelSplitter(2); out.connect(sp); sp.connect(merger, 0, ch); sp.connect(merger, 1, ch + 1); }
+      else { const mono = ctx.createGain(); mono.channelCount = 1; mono.channelCountMode = 'explicit'; out.connect(mono); mono.connect(merger, 0, ch); }
+      ch += n;
+    }
+    try { c.output.destinationGain.disconnect(ctx.destination); st.silent = true; } catch (e) { st.silent = false; }
+    let queue = Promise.resolve(), pending = [], first = true;
+    const flush = () => { if (!pending.length) return; const body = new Blob(pending); pending = [];
+      const headers = { 'X-Club-Save': '1' }; if (first) { headers['X-Club-First'] = '1'; first = false; }
+      queue = queue.then(() => fetch('/append/' + name + '.f32', { method: 'POST', headers, body })).then((r) => { if (!r.ok) st.error = 'http ' + r.status; st.sent += body.size; }).catch((e) => { st.error = String(e); }); };
+    node.port.onmessage = (e) => { if (st.state !== 'recording') return; pending.push(e.data); st.frames += e.data.length / total; if (pending.length >= 16) flush(); };
+    st.stop = async () => { st.state = 'stopping'; flush(); await queue; st.state = 'saved'; };
+  };
+}
 let last = performance.now();
 (function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(barNow(), dt); window.club.frames++; requestAnimationFrame(loop); })(last);
 </script>

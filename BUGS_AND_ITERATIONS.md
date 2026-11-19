@@ -155,3 +155,23 @@ Joona: "a lime ash pfp and banner pfp of just her banner of her djing in the boi
 `still()` gains `solo` (hides crowd, MC and Claudios) and `crowdDim` (darkens the crowd so her white suit reads against it). PFP: 1600², bar 30.2, solo, a low 3/4 camera so her eyes show under the visor, the neon heart behind her. Banner: 2560×1440, bar 63.25 (drop, hand up), crowdDim .4, camera at her face height (a higher one put key-light glare on the visor). Checked as crops: the circle at 400 and 120 px, the desktop strip 2560×423 and the 1546×423 safe area (head, decks and a Claudio either side inside both). Files are local in `renders/` (git-ignored).
 
 RSI: ~25 min, 10 test frames -> top loss: framing judged on the full 16:9 before checking the 423 px strip viewers actually see -> fix: guide boxes for the strip and safe area are drawn on every banner test from the first frame.
+
+## ITER-019 (2026-11-19): the mix from stems, the hi-hat tick, Ash's arms, the six-seven emote
+**Sound (Joona: "whats that clicking like sound is it the highhat? it takes up too much room sounds like a metronome", "mix master & layer correctly", "chain drums").**
+- The tick was the closed hi-hat: straight eighths at up to 0.5 gain, and alone over the plucks in the intro and outro. Now short, high-passed at 7.5 kHz, 0.06/0.2 gain with the accent off the beat; no hats without a kick; rim at 0.16.
+- The live sum was clipping: measured from an unclamped capture it peaks at **+4.5 dBFS** (true peak +4.6), -10.1 LUFS. The club page now plays 5 dB lower so the output no longer clips.
+- Buses: kick (orbit 9), other drums (1), bass and sub (8), music (2), lead (3), chops (4), distant vocal (5), the line (6), announcer (7); the kick ducks music and bass.
+- `?stems=<name>` on the club page captures the full mix and every bus as one 18-channel float stream through a worklet (sample-aligned, speakers disconnected), appended to `renders/<name>.f32`.
+- `tools/mix.py`: null test (stems minus the full mix: **-33.0 dB**), bar 1 found from the first kick, every stem at the same gain (the balance that was played), low cuts so kick and bass own the low end, **kick + drums through one bus compressor and soft saturation**, steadier vocal and announcer, a light glue compressor, then a limiter to the target.
+- Result: `master-14` **-14.1 LUFS, -1.3 dBTP, LRA 10.9**, 24-bit 48 kHz, 253.9 s starting on bar 1; `master-loud-10` -10.8 LUFS, -1.2 dBTP. Flat factor 0 on both (no flattened peaks). Not heard by anyone yet: Joona was on a break with the sound muted.
+
+**Picture.**
+- Joona: "her arms seem broken this is not correct" and "ash should be fist bumping in the air as well". Arms are now posed by direction (each bone turned the shortest way from its T-pose direction to where the elbow or hand should be), not by guessed Euler angles. Fist pumps: both arms on a drop's first bar, then right and left in turn on bars 2 and 4 of every four, once per four in the grooves; fingers curl into a fist; the fist is highest on the kick.
+- Joona: "when the 67 emote comes have ashe do the 67 emote and the claudios. 2 of the claudios jump onto her hand for it the others do the 67 emote as well." On bars 45, 61, 69, 101, 109, 117: palms up, her left hand up on "six" and her right on "seven", for two bars; classic and shades jump from the booth onto her hands half a bar before, ride them, and hop back; the other five rock in turn; the camera cuts to a front shot.
+- Her white outfit blew out under the strobe and the drop lights: the strobe moved over the crowd and her base colour is dimmed further.
+Checked by screenshot (decks front and side, pump at bars 65.5 and 105.5, emote at 59.8, 61.0, 61.5 and 101.0), no console errors.
+
+## BUG-009 (2026-11-19): every Claudio stopped moving
+Root cause: an end-of-line comment was pasted in front of `claudios.push(c);` on the same line, so no Claudio was registered and none was animated. Caught before commit: the emote screenshot showed no riders, and the rider list read back empty. Check: after a scene edit, read `club.claudios.length` (must be 7) along with the screenshot.
+
+RSI: ~75 min, 3 pose rounds, 3 mix-script reruns -> top loss: all earlier listening was through a clipping output (+4.5 dBFS) that no check measured -> fix: stems capture + `mix.py` measure peak, loudness and the null test on every master; the live page plays with headroom.

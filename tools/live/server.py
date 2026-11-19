@@ -27,7 +27,7 @@ def main():
         def do_POST(self):
             # stills and audio takes made in the club page are saved to renders/ (local only, git-ignored)
             import re
-            m = re.fullmatch(r"/save/([a-z0-9_-]{1,60}\.(?:png|webm|wav))", self.path)
+            m = re.fullmatch(r"/(save|append)/([a-z0-9_-]{1,60}\.(?:png|webm|wav|f32))", self.path)   # append: raw stem audio, sent in pieces
             n = int(self.headers.get("Content-Length", 0))
             # only the club page itself may save: same-origin, plus a custom header a cross-site form cannot send
             ok_origin = self.headers.get("Origin", "") in (f"http://127.0.0.1:{args.port}", f"http://localhost:{args.port}")
@@ -36,7 +36,8 @@ def main():
             if not m or n <= 0 or n > 250_000_000:
                 self.send_error(400); return
             out = ROOT / "renders"; out.mkdir(exist_ok=True)
-            with open(out / m.group(1), "wb") as fh:                      # streamed, not held in memory
+            first = m.group(1) == "save" or self.headers.get("X-Club-First") == "1"
+            with open(out / m.group(2), "wb" if first else "ab") as fh:                      # streamed, not held in memory
                 left = n
                 while left > 0:
                     chunk = self.rfile.read(min(left, 1 << 20))
@@ -44,7 +45,8 @@ def main():
                         break
                     fh.write(chunk); left -= len(chunk)
             self.send_response(200); self.send_header("Content-Length", "2"); self.end_headers(); self.wfile.write(b"ok")
-            print(f"saved renders/{m.group(1)} ({n} bytes)", flush=True)
+            if first:
+                print(f"saved renders/{m.group(2)} ({n} bytes)", flush=True)
 
         def do_GET(self):
             if self.path == "/":
