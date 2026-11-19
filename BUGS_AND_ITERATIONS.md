@@ -287,3 +287,10 @@ Joona on v6: "at 1:47 the claudios should circle lime ash and her hair clips thr
 - Render on both Forge cards: 4,800 frames, 89 and 90 s; `renders/cyber-space-set-v7.mp4`.
 
 RSI: ~45 min, 1 slow review render (6 min in a throttled pane) -> top loss: the close-up review ran in the browser pane at about 1 frame per 0.8 s -> fix: next time, render review frames on the Forge with the same renderer (render_video.mjs takes any frame range).
+
+## ITER-028 (2026-11-19): release package for Audius and DistroKid
+Joona: "put a folder in my downloads called Baby Ash project ... the video ... the actual music ... new album cover art with her and the Claudios ... upload those to Audius ... DistroKid". In `~/Downloads/Baby Ash project/`: the v7 video; the master as 16-bit 44.1 kHz WAV (DistroKid), 24-bit 48 kHz WAV and 320 kbps MP3 (all 160.0 s, -14.2 LUFS, -1.4 dBTP); three covers at 3000 x 3000 (JPG and PNG): A (the six-seven with the Claudios on her hands, her name in neon, the disco ball and the LoveSpark sign), A store (the same without the LoveSpark sign: the only text is the artist name), B (from above, the Claudio ring and the crowd, no text).
+`club.still(..., { cover: true | 'store' })` hides third-party marks for release art: the "Claude loves art" sign, the starburst heart, the booth sign and the shirt starbursts. The record labels now show a LoveSpark heart instead of a starburst (in the video too, from the next render).
+Open before release (Joona's call): the intro says "This is Boiler Room" (another company's brand) and shouts out Anthropic and Claude; Claudio is styled after Claude's mascot.
+
+RSI: ~25 min, 1 framing round -> no loss worth fixing.

@@ -225,8 +225,8 @@ const vinylTex = canvasTex(512, 512, (g, w) => {
   const sh = g.createLinearGradient(0, 0, w, w); sh.addColorStop(.35, 'rgba(255,255,255,0)'); sh.addColorStop(.5, 'rgba(255,255,255,.10)'); sh.addColorStop(.65, 'rgba(255,255,255,0)');
   g.fillStyle = sh; g.beginPath(); g.arc(c, c, c * .985, 0, 7); g.fill();
   g.fillStyle = '#ff4fb0'; g.beginPath(); g.arc(c, c, c * .34, 0, 7); g.fill();                                   // the label
-  g.strokeStyle = '#ffe14f'; g.lineWidth = 6; g.lineCap = 'round';
-  for (let j = 0; j < 12; j++) { const t = j / 12 * Math.PI * 2 + .13, r1 = c * .08, r2 = c * (j % 2 ? .17 : .22); g.beginPath(); g.moveTo(c + Math.cos(t) * r1, c + Math.sin(t) * r1); g.lineTo(c + Math.cos(t) * r2, c + Math.sin(t) * r2); g.stroke(); }
+  g.fillStyle = '#ffe14f'; g.beginPath(); const hs = c * .011;                       // a LoveSpark heart on the label (no third-party mark on the records)
+  g.moveTo(c, c + 14 * hs); g.bezierCurveTo(c - 22 * hs, c, c - 14 * hs, c - 16 * hs, c, c - 7 * hs); g.bezierCurveTo(c + 14 * hs, c - 16 * hs, c + 22 * hs, c, c, c + 14 * hs); g.fill();
   g.fillStyle = '#1a0a14'; g.font = '700 30px ui-monospace, Menlo, monospace'; g.textAlign = 'center'; g.fillText('LOVESPARK', c, c + c * .29);
   g.fillStyle = '#d8d8e0'; g.beginPath(); g.arc(c, c, 5, 0, 7); g.fill();
 });
@@ -943,11 +943,14 @@ function frame(bar, dt) {
 const ed = document.getElementById('ed'), params = new URLSearchParams(location.search);
 let sched = null, fake = params.has('bar') ? { bar0: +params.get('bar'), t0: performance.now(), hold: params.has('hold') } : null;
 const barNow = () => sched ? sched.now() % BARS : fake ? (fake.hold ? fake.bar0 : (fake.bar0 + (performance.now() - fake.t0) / 1000 * (126 / 240)) % BARS) : 0;
-async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 50, solo = false, crowdDim = 1 } = {}) {
+async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 50, solo = false, crowdDim = 1, cover = false } = {}) {
   renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setSize(w, h); camera.fov = fov; camera.aspect = w / h; camera.updateProjectionMatrix();
   camOverride = cam; nameSigns.forEach((m) => { m.visible = names; });
   const crowd0 = crowdMat.color.clone(); crowdMat.color.multiplyScalar(crowdDim); dancerMats.forEach((m) => m.color.multiplyScalar(crowdDim));   // a darker crowd so the DJ reads against it
   soloHide = solo ? [bodies, arms, phones, mouths, logos, ...people.map((p) => p.head), ...dancers.map((d) => d.holder), mc?.scene, ...claudios.map((c) => c.anchor)].filter(Boolean) : [];
+  // release artwork (DistroKid, Audius): no third-party marks: the 'Claude loves art' sign, the starburst heart, the booth sign and the shirt starbursts stay out
+  if (cover) soloHide.push(signs[0].m, signs[0].l, signs[1].m, signs[1].l, boothSign, logos);
+  if (cover === 'store') soloHide.push(signs[2].m, signs[2].l);                         // store artwork: only the artist name as text
   for (let i = 0; i < settle; i++) frame(bar, 1 / 60);
   const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
   const res = await fetch('/save/' + name, { method: 'POST', headers: { 'X-Club-Save': '1' }, body: blob });
