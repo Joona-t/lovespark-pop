@@ -21,10 +21,11 @@
 | 117-132 | outro | energy winds down, wide shot, lights fade |
 
 ## What exists in the preview
-Ash (her VRM, hands on the decks, head and body on the beat), three Claudios built in code from his master sheet (two on speaker stacks, a small one on the booth), 54 background dancers, glyph-grid LED wall and booth front, spots, wash, strobe, bloom, six camera angles cut on bar lines.
+Ash (her VRM, hands on the decks, head and body on the beat), the seven rigged Claudios from ashley-pc (headphones and cyber on the speaker stacks, classic and shades on the booth, crown and snapback on podiums, bunny carried over the crowd; they blink, and look surprised when a drop hits), 54 background dancers with faces, glyph-grid LED wall and booth front, spots, wash, strobe, bloom, six camera angles cut on bar lines.
 
 ## Not done yet (after Joona's OK on the look)
-- Claudio's real model from ashley-pc (the code-built one is a stand-in), the K-pop cast as extra dancers or co-DJs.
+- Bvby Ash's new model from ashley-pc in place of the older Ashley VRM; the K-pop cast as extra dancers or co-DJs.
+- Proper character animation made on ashley-pc (dance and DJ motion clips for Ash, authored motion for the Claudios) to replace the code-driven bobbing.
 - Crowd as characters instead of capsule figures; outfit and look pass on Ash.
 - Full render: frames from `window.club.render(bar)` in headless Chromium on the Forge (one process per GPU), audio from a WAV render of the set, 16:9 at 1080p or 4K; layout and contact-sheet checks; three title and thumbnail pairs.
 - Name: "Boiler Room" is a real brand; the public video needs our own name.

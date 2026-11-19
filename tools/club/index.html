@@ -133,10 +133,31 @@ function makeClaudio() {
   }
   return g;
 }
-const claudios = [];
-for (const [x, y, z, sc, ry] of [[-1.9, 1.3, .35, .44, .25], [1.9, 1.3, .35, .44, -.25], [1.08, 1.05, .8, .2, -.3]]) {
-  const c = makeClaudio(); c.position.set(x, y, z); c.scale.setScalar(sc); c.rotation.y = ry; c.userData.baseY = y; c.userData.sc = sc; scene.add(c); claudios.push(c);
+// The seven Claudios from ashley-pc (rigged VRMs with blink and surprised); the code-built one stands in until each loads.
+// [variant, x, y, z, width in metres, turn, crowd-surfer]
+const CLAUDIOS = [
+  ['headphones', -1.9, 1.3, .35, .78, .25], ['cyber', 1.9, 1.3, .35, .78, -.25],          // on the speaker stacks
+  ['classic', -1.08, 1.04, .8, .34, .3], ['shades', 1.08, 1.04, .8, .34, -.3],            // on the booth
+  ['crown', -1.3, 1.0, -.85, .62, .15], ['snapback', 1.3, 1.0, -.85, .62, -.15],          // on podiums behind Ash
+  ['bunny', 0, 2.0, -2.2, .56, 0, true]];                                                 // carried over the crowd
+for (const x of [-1.3, 1.3]) {
+  const pod = new THREE.Mesh(new THREE.BoxGeometry(.8, 1.0, .6), dark); pod.position.set(x, .5, -.85); scene.add(pod);
+  const led = new THREE.Mesh(new THREE.BoxGeometry(.8, .04, .02), new THREE.MeshBasicMaterial({ color: CYAN })); led.position.set(x, .96, -.54); scene.add(led);
 }
+const claudios = [];
+const claudioLoader = new GLTFLoader().register((p) => new VRMLoaderPlugin(p));
+CLAUDIOS.forEach(([variant, x, y, z, w, ry, surf], i) => {
+  const anchor = new THREE.Group(); anchor.position.set(x, y, z); anchor.rotation.y = ry; scene.add(anchor);
+  const holder = new THREE.Group(); anchor.add(holder);
+  const standIn = makeClaudio(); standIn.scale.setScalar(w / 2.2); holder.add(standIn);
+  const c = { anchor, holder, baseX: x, baseY: y, w, surf: !!surf, vrm: null, variant, i }; claudios.push(c);
+  claudioLoader.load(`/models/claudio/Claudio-${variant}.vrm`, (gltf) => {
+    const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); vrm.scene.traverse((o) => { o.frustumCulled = false; });
+    const box = new THREE.Box3().setFromObject(vrm.scene), size = box.getSize(new THREE.Vector3()), k = w / Math.max(size.x, .001);
+    vrm.scene.scale.setScalar(k); vrm.scene.position.set(-(box.min.x + box.max.x) / 2 * k, -box.min.y * k, -(box.min.z + box.max.z) / 2 * k);
+    holder.remove(standIn); holder.add(vrm.scene); c.vrm = vrm;
+  }, undefined, (e) => console.error('claudio model failed to load: ' + variant, e));
+});
 
 // ---------- crowd (behind the DJ, the Boiler Room way) ----------
 const N = 54, dummy = new THREE.Object3D();
@@ -145,6 +166,10 @@ const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.19, .62, 4, 10
 const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(.13, 14, 12), crowdMat, N);
 const arms = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.05, .5, 3, 8), crowdMat, N * 2);
 const phones = new THREE.InstancedMesh(new THREE.BoxGeometry(.08, .15, .01), new THREE.MeshBasicMaterial({ color: 0xcfe8ff }), N);
+// faces: two eyes and a mouth on every dancer, looking at the booth; mouths open when they cheer
+const faceMat = new THREE.MeshBasicMaterial({ color: 0x120a10 });
+const eyes = new THREE.InstancedMesh(new THREE.SphereGeometry(.021, 8, 8), faceMat, N * 2);
+const mouths = new THREE.InstancedMesh(new THREE.SphereGeometry(.03, 10, 8), new THREE.MeshBasicMaterial({ color: 0x3a0f1c }), N);
 const people = [];
 const SHIRTS = [0x2b2140, 0x1c2a44, 0x3a1d3a, 0x14323a, 0x40222c, 0x26263a, 0x4a2f1a];
 for (let i = 0; i < N; i++) {
@@ -156,7 +181,7 @@ for (let i = 0; i < N; i++) {
   bodies.setColorAt(i, col3); heads.setColorAt(i, new THREE.Color().setHSL(.07 + rand(i + 13) * .04, .35, .32 + rand(i + 17) * .2));
   arms.setColorAt(i * 2, col3); arms.setColorAt(i * 2 + 1, col3);
 }
-scene.add(bodies, heads, arms, phones);
+scene.add(bodies, heads, arms, phones, eyes, mouths);
 function poseCrowd(bar, sec, pulse) {
   const [, name, energy] = sec, beat = bar * 4, cheer = name === 'announce' ? 1 : 0;
   for (let i = 0; i < N; i++) {
@@ -166,6 +191,13 @@ function poseCrowd(bar, sec, pulse) {
     const y = p.h * .62 + jump;
     dummy.position.set(p.x + sway, y, p.z); dummy.rotation.set(0, 0, p.lean * .4 + sway * .8); dummy.scale.set(1, p.h, 1); dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
     dummy.position.set(p.x + sway * 1.5, y + p.h * .62, p.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
+    const hx = p.x + sway * 1.5, hy = y + p.h * .62, look = Math.sin(bar * .6 + p.ph) * .25;                     // head centre, a little glance left and right
+    for (const side of [-1, 1]) {
+      dummy.position.set(hx + side * .047 + look * .03, hy + .018, p.z + .118); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1.35, .5); dummy.updateMatrix();
+      eyes.setMatrixAt(i * 2 + (side === 1 ? 1 : 0), dummy.matrix);
+    }
+    const open = Math.max(0, energy * p.lively + cheer * p.lively - .45) * (.5 + .5 * up);                          // shouting in the drops and the intro
+    dummy.position.set(hx + look * .03, hy - .05, p.z + .116); dummy.scale.set(1 + open * .3, .28 + open * 1.5, .4); dummy.updateMatrix(); mouths.setMatrixAt(i, dummy.matrix);
     // arms: down at low energy, pumping in the air when it kicks off; each person has their own threshold
     const wants = Math.min(1, Math.max(0, (energy + cheer * .5 + .25 * Math.sin(bar * .8 + p.ph) - (1 - p.lively) * .9) * 2.2));
     for (const side of [-1, 1]) {
@@ -178,7 +210,7 @@ function poseCrowd(bar, sec, pulse) {
     const showPhone = p.phone && (energy > .6 || cheer);
     dummy.position.set(p.x + sway + .26, showPhone ? y + p.h * .28 + .86 : -5, p.z + .08); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); phones.setMatrixAt(i, dummy.matrix);
   }
-  bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
+  eyes.instanceMatrix.needsUpdate = mouths.instanceMatrix.needsUpdate = bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
 }
 
 // ---------- lights ----------
@@ -219,10 +251,10 @@ function poseAsh(bar, sec, pulse, dt) {
 const SHOTS = [
   { p: [0, 1.5, 4.4], t: [0, 1.42, 0] },            // 0 wide, front of the decks
   { p: [.55, 1.5, 2.55], t: [0, 1.36, 0] },          // 1 Ash close
-  { p: [-2.6, 1.75, 2.1], t: [-1.9, 1.5, .35] },     // 2 Claudio on the left stack
+  { p: [-2.7, 1.85, 2.3], t: [-1.9, 1.62, .35] },     // 2 Claudio on the left stack
   { p: [3.7, 1.9, 2.4], t: [0, 1.2, -.6] },          // 3 side, booth and crowd
   { p: [0, 3.1, 4.0], t: [0, 1.25, -1.2] },           // 4 high, the whole room
-  { p: [1.55, 1.34, 1.95], t: [1.0, 1.16, .8] },      // 5 little Claudio on the mixer
+  { p: [1.6, 1.36, 1.95], t: [1.05, 1.2, .8] },      // 5 little Claudio on the mixer
 ];
 function shotAt(bar, sec) {
   const [start, name, energy] = sec;
@@ -248,13 +280,20 @@ function frame(bar, dt) {
   platters.forEach((p, i) => { p.rotation.y = -bar * Math.PI * 2 * 1.11 * (i ? 1 : .98); });
   leds.forEach((l, i) => { l.visible = (i / 10) < (.25 + pulse * .8 * (.4 + energy)); });
   stacks.forEach((s) => { s.userData['cone0.26'].position.z = .36 + pulse * .035 * energy; s.userData['cone0.17'].position.z = .36 + pulse * .015; });
-  claudios.forEach((c, i) => {                       // squash on the kick, pop up after it, tiny hop turns in the drops
-    const hop = Math.abs(Math.sin(beat * Math.PI + i * .4)) * (.05 + .22 * energy) * c.userData.sc * 2.2;
+  claudios.forEach((c, i) => {                       // squash on the kick, hop after it, wobble; blink now and then, surprised when a drop hits
+    const hop = Math.abs(Math.sin(beat * Math.PI + i * .4)) * (.02 + .1 * energy) * c.w * 1.6;
     const sq = 1 - .16 * pulse * (.4 + energy);
-    c.userData.body.scale.set(1 + (1 - sq) * .6, sq, 1 + (1 - sq) * .6); c.position.y = c.userData.baseY + hop;
-    c.userData.arms.forEach((a, k) => { a.rotation.x = Math.sin(beat * Math.PI + k * Math.PI) * .9 * (.3 + energy); });
-    c.userData.legs.forEach((l, k) => { l.position.y = .13 + Math.max(0, Math.sin(beat * Math.PI * 2 + k * 1.1)) * .05 * energy; });
-    c.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .06 * (.3 + energy);
+    c.holder.scale.set(1 + (1 - sq) * .6, sq, 1 + (1 - sq) * .6);
+    c.anchor.position.y = c.baseY + hop + (c.surf ? Math.sin(beat * Math.PI) * .06 : 0);
+    if (c.surf) { c.anchor.position.x = Math.sin(bar * .45) * 2.6; c.anchor.visible = energy >= .5; c.anchor.rotation.y = Math.sin(bar * .45 + 1.2) * .5; }
+    c.holder.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .07 * (.3 + energy);
+    const em = c.vrm?.expressionManager;
+    if (em) {
+      const blinkPh = (bar * 1.3 + i * .37) % 1;
+      em.setValue('blink', blinkPh < .04 ? 1 : 0);
+      em.setValue('surprised', (name === 'drop' || name === 'final') && bar - start < 1 ? 1 : 0);
+      c.vrm.update(dt);
+    }
   });
   poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt);
   spots.forEach((s, i) => {

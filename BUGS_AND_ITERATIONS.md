@@ -93,3 +93,11 @@ RSI: ~8 min, 0 re-work -> no loss worth fixing (one generation, one check, one l
 Checked by screenshot at bars 2, 63, 64, 66 and live with audio: no console errors, set playing, scene in the right section. Found and fixed on the way: lights 5x too bright (three r160 uses physical units), the hidden editor leaking text, Ash's arm rotations inverted, hair physics exploding from the T-pose (spring bones now reset after the first posed frame). Not yet checked: 16:9 framing, phone width, a full run through all 132 bars, frame rate with the pane visible (the hidden pane throttles to 1 fps).
 
 RSI: ~35 min, 5 look-fix rounds -> top loss: screenshots lagged the requested bar in the throttled pane, hiding what a change did -> fix: `club.render(bar, n)` renders the exact bar on demand; it is also the hook for the final frame render.
+
+## ITER-012 (2026-11-19): real Claudios, crowd faces, fewer vocals
+- The seven rigged Claudio VRMs from ashley-pc replace the code-built stand-ins in the club scene (local `models/claudio/`, not in the repo); each is scaled from its bounding box, squashes and hops on the beat, blinks, and uses its "surprised" expression on the first bar of a drop.
+- Joona: "add faces to the people in the background": every dancer has eyes and a mouth that opens when they cheer.
+- Joona: "too many vocals": the line now comes once every 8 bars (22 events over the set, was 43), the ah-chops are a 2-bar fill at the end of each 8 (40 events, was about 200), one "hey" per 8 bars, and the distant "can you feel it"s are halved. Both 09 and 10.
+Checked: screenshot at bar 63 with all models loaded and no console errors; live run playing with the new counts read off the scheduler's pattern.
+
+RSI: ~15 min, 0 re-work -> no loss worth fixing.

@@ -72,7 +72,7 @@ const leadHigh = lead.add(note(12)).gain(.2).pan(.7)
 const wake = s("<vox_wakeup ~ vox_wakeup:1 ~>").delay(.5).delaytime(3/8).delayfeedback(.5).room(.5).gain(.9).orbit(4)
 const chops = s("vox_ah").struct("~ [~ x] ~ [x x] ~ [~ x] [~ x] ~").begin(.08).clip(.45)
   .speed("<1 1 1.19 .89>").hpf(400).pan(sine.fast(4).range(.25, .75)).room(.5).gain(.5).orbit(4)
-const hey = s("<~ ~ ~ [~ ~ ~ vox_hey]>").speed(1.1).room(.5).gain(.6).orbit(4)
+const hey = s("<~!7 [~ ~ ~ vox_hey]>").speed(1.1).room(.5).gain(.6).orbit(4)
 const far = (name) => s(name).hpf(500).room(.8).roomsize(6).delay(.4).delaytime(3/8).delayfeedback(.5).gain(.65).orbit(5)
 
 // The sung line is out of the arrangement (Joona, 2026-11-19: "remove the i have been waiting for this"); samples and this line kept
@@ -80,8 +80,8 @@ const sing = s(`<
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forsucha sing_long] sing_time
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forallof sing_my] sing_life>`)
   .hpf(300).room(.25).delay(.15).delaytime(3/8).delayfeedback(.3).gain(.5).orbit(6)
-// "six, seven ... can you feel it": the whole lyric (Joona, 2026-11-19), once every 4 bars
-const sixSeven = s("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] sultry_feelit ~ ~>")
+// "six, seven ... can you feel it": the whole lyric (Joona, 2026-11-19), once every 8 bars (Joona: "too many vocals")
+const sixSeven = s("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] sultry_feelit ~ ~ ~ ~ ~ ~>")
   .room(.3).delay(.25).delaytime(3/8).delayfeedback(.35).gain(.85).orbit(6)
 
 // the announcer over a cheering crowd; the set starts on bar 13
@@ -93,15 +93,15 @@ const announce = stack(
 
 arrange(
   [12, announce],
-  [8,  stack(plucks(.5, 2), hats.gain(.3), far("<~ ~ ~ sultry_feelit ~ ~ ~ ~>"))],
+  [8,  stack(plucks(.5, 2), hats.gain(.3), silence)],
   [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],
-  [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven.mask("<0!8 1!8>"), chops.mask("<0!8 1!8>"))],
+  [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven.mask("<0!8 1!8>"))],
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],
-  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops, hey)],
-  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ ~ sultry_feelit ~ ~ ~ sultry_feelit:1>"))],
-  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ sultry_feelit ~ ~ ~ sultry_feelit:1 ~ ~>"))],
-  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops, hey)],
-  [8,  stack(kick, hats, bass(Aroots), plucks(4, 2), far("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~ [sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~>"))],
+  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops.mask("<0!6 1!2>"), hey)],
+  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ ~ ~ ~ ~ ~ sultry_feelit:1>"))],
+  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],
+  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"), hey)],
+  [8,  stack(kick, hats, bass(Aroots), plucks(4, 2), far("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~ ~ ~ ~ ~>"))],
   [8,  stack(hats.gain(.3), plucks(2, .3), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>"))],
 )
