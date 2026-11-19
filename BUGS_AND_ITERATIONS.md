@@ -101,3 +101,10 @@ RSI: ~35 min, 5 look-fix rounds -> top loss: screenshots lagged the requested ba
 Checked: screenshot at bar 63 with all models loaded and no console errors; live run playing with the new counts read off the scheduler's pattern.
 
 RSI: ~15 min, 0 re-work -> no loss worth fixing.
+
+## ITER-013 (2026-11-19): crowd as cel-anime characters
+Joona sent a retro cel-anime crowd frame as the style reference: "make them have hair etc... real unique faces". Taking the style cues, not those characters: every dancer now has a drawn anime face from a 64-cell sheet generated in code (eye shape, size, tilt and colour, brows, mouth, blush, the odd closed eyes or beauty mark, all seeded per person), one of six haircuts in twelve colours, six skin tones, a three-tone cel ramp, a slightly large head, and a blue key on the crowd. Heads nod on the beat and glance around; mouths open when they shout.
+Checked by screenshot close on the crowd and live with audio (no console errors). First pass blew out to white: pastel cel colours under physical-unit lights; the crowd palette is now dimmed to 0.42 so the lights do the colouring.
+Still capsule bodies; real character bodies or generated 2D art are the next step if this direction holds.
+
+RSI: ~12 min, 1 look-fix round -> no loss worth fixing.

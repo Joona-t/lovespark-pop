@@ -159,29 +159,93 @@ CLAUDIOS.forEach(([variant, x, y, z, w, ry, surf], i) => {
   }, undefined, (e) => console.error('claudio model failed to load: ' + variant, e));
 });
 
-// ---------- crowd (behind the DJ, the Boiler Room way) ----------
+// ---------- crowd (behind the DJ): cel-shaded dancers, each with their own hair, hair colour and drawn face ----------
 const N = 54, dummy = new THREE.Object3D();
-const crowdMat = new THREE.MeshStandardMaterial({ roughness: .8, metalness: .1 });
+const ramp = new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 150, 150, 150, 255, 255, 255, 255, 255]), 3, 1); ramp.needsUpdate = true;
+ramp.minFilter = ramp.magFilter = THREE.NearestFilter;                                  // three flat tones = the cel look
+const toon = (color, k = .42) => new THREE.MeshToonMaterial({ color: new THREE.Color(color).multiplyScalar(k), gradientMap: ramp });   // dimmed: club lights do the colouring
+const crowdMat = toon(0xffffff, .42);
 const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.19, .62, 4, 10), crowdMat, N);
-const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(.13, 14, 12), crowdMat, N);
 const arms = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.05, .5, 3, 8), crowdMat, N * 2);
 const phones = new THREE.InstancedMesh(new THREE.BoxGeometry(.08, .15, .01), new THREE.MeshBasicMaterial({ color: 0xcfe8ff }), N);
-// faces: two eyes and a mouth on every dancer, looking at the booth; mouths open when they cheer
-const faceMat = new THREE.MeshBasicMaterial({ color: 0x120a10 });
-const eyes = new THREE.InstancedMesh(new THREE.SphereGeometry(.021, 8, 8), faceMat, N * 2);
 const mouths = new THREE.InstancedMesh(new THREE.SphereGeometry(.03, 10, 8), new THREE.MeshBasicMaterial({ color: 0x3a0f1c }), N);
+const SHIRTS = [0xe8d9ff, 0xffd0e6, 0xbfe9ff, 0xfff0c2, 0xd6ffe4, 0xffc9b8, 0xcfd4ff, 0xf5f5f5];
+const HAIR = [0xff8fc0, 0xf2b441, 0xff7a3d, 0x57d6c9, 0xb08cff, 0x2c3e8f, 0xf4f1ea, 0xd9423a, 0x7a4a2a, 0x1b1b2a, 0x9be36b, 0xff5fa8];
+const SKIN = [0xffe2cf, 0xf6cdb0, 0xe3ad86, 0xc98a62, 0x9a6444, 0x7a4b33];
+const EYES = ['#3a6bd8', '#2e9e6e', '#8a4fd0', '#b5651d', '#d24b6a', '#2bb3c0', '#444'];
+
+// one sheet of 64 drawn faces; every dancer gets a different cell
+const FC = 128, faceSheet = document.createElement('canvas'); faceSheet.width = faceSheet.height = FC * 8;
+const fx = faceSheet.getContext('2d');
+function drawFace(k) {
+  const ox = (k % 8) * FC, oy = Math.floor(k / 8) * FC, r = (j) => rand(k * 13 + j);
+  fx.save(); fx.translate(ox, oy);
+  const eyeY = 54 + r(1) * 6, gap = 23 + r(2) * 6, ew = 11 + r(3) * 5, eh = 9 + r(4) * 9, tilt = (r(5) - .5) * .5, iris = EYES[Math.floor(r(6) * EYES.length)];
+  const closed = r(7) > .88, lash = r(8) > .5;
+  for (const sd of [-1, 1]) {
+    const cx = 64 + sd * gap;
+    fx.save(); fx.translate(cx, eyeY); fx.rotate(sd * tilt * .4);
+    if (closed) { fx.strokeStyle = '#20141c'; fx.lineWidth = 3.5; fx.lineCap = 'round'; fx.beginPath(); fx.arc(0, -2, ew * .8, .15 * Math.PI, .85 * Math.PI); fx.stroke(); }
+    else {
+      fx.fillStyle = '#fff'; fx.beginPath(); fx.ellipse(0, 0, ew, eh, 0, 0, 7); fx.fill();
+      fx.fillStyle = iris; fx.beginPath(); fx.ellipse(0, 1, ew * .62, eh * .86, 0, 0, 7); fx.fill();
+      fx.fillStyle = '#16101a'; fx.beginPath(); fx.ellipse(0, 2, ew * .3, eh * .45, 0, 0, 7); fx.fill();
+      fx.fillStyle = '#fff'; fx.beginPath(); fx.ellipse(-ew * .28, -eh * .38, ew * .2, eh * .2, 0, 0, 7); fx.fill();
+      fx.strokeStyle = '#20141c'; fx.lineWidth = 4; fx.lineCap = 'round'; fx.beginPath(); fx.ellipse(0, 0, ew + 1, eh + 1, 0, 1.05 * Math.PI, 1.95 * Math.PI); fx.stroke();   // heavy upper lid
+      if (lash) { fx.lineWidth = 2.5; fx.beginPath(); fx.moveTo(sd * (ew + 1), -2); fx.lineTo(sd * (ew + 6), -7); fx.stroke(); }
+    }
+    fx.restore();
+    fx.strokeStyle = '#2a1a22'; fx.lineWidth = 3 + r(9) * 2; fx.lineCap = 'round'; fx.beginPath();                    // brow: angle sets the mood
+    const by = eyeY - eh - 9 - r(10) * 4, slope = (r(11) - .5) * 9;
+    fx.moveTo(cx - sd * ew, by + slope * sd * -1 * .5 + slope); fx.lineTo(cx + sd * ew, by - slope); fx.stroke();
+  }
+  fx.strokeStyle = 'rgba(60,30,40,.55)'; fx.lineWidth = 2; fx.beginPath(); fx.moveTo(64, eyeY + 14); fx.lineTo(62 + r(12) * 4, eyeY + 20); fx.stroke();   // nose
+  const my = 92 + r(13) * 5, mk = Math.floor(r(14) * 4);
+  fx.strokeStyle = '#7a2334'; fx.fillStyle = '#7a2334'; fx.lineWidth = 3; fx.lineCap = 'round'; fx.beginPath();
+  if (mk === 0) fx.arc(64, my - 5, 9, .2 * Math.PI, .8 * Math.PI);                      // smile
+  else if (mk === 1) { fx.moveTo(57, my); fx.lineTo(71, my); }                          // flat
+  else if (mk === 2) fx.arc(64, my - 2, 5, .1 * Math.PI, .9 * Math.PI);                 // small smile
+  else { fx.moveTo(58, my - 1); fx.quadraticCurveTo(64, my + 5, 71, my - 3); }          // smirk
+  fx.stroke();
+  if (r(15) > .45) { fx.fillStyle = 'rgba(255,120,150,.33)'; for (const sd of [-1, 1]) { fx.beginPath(); fx.ellipse(64 + sd * (gap + 9), eyeY + 19, 9, 5, 0, 0, 7); fx.fill(); } }
+  if (r(16) > .9) { fx.fillStyle = '#20141c'; fx.beginPath(); fx.arc(64 + gap + 6, eyeY + 12, 1.8, 0, 7); fx.fill(); }   // beauty mark
+  fx.restore();
+}
+for (let k = 0; k < 64; k++) drawFace(k);
+const faceTex = new THREE.CanvasTexture(faceSheet); faceTex.colorSpace = THREE.SRGBColorSpace;
+const headGeo = new THREE.SphereGeometry(.135, 20, 16), faceGeo = new THREE.SphereGeometry(.1365, 16, 12, Math.PI / 2 - .95, 1.9, .5, 1.75);
+const capGeo = new THREE.SphereGeometry(.147, 18, 12, 0, Math.PI * 2, 0, Math.PI * .56);
+function makeHair(style, mat, k) {                                                   // six cuts from simple shapes
+  const g = new THREE.Group(), add = (geo, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, 0, rz); g.add(m); return m; };
+  const cap = add(capGeo, 0, .005, -.012); cap.rotation.x = -.28;                       // crown, tipped back off the face
+  add(new THREE.BoxGeometry(.2, .05, .04), 0, .085, .112, 1, 1, 1, .5);                 // fringe
+  const ball = new THREE.SphereGeometry(.07, 12, 10), cone = new THREE.ConeGeometry(.045, .15, 8);
+  if (style === 0) { add(ball, -.115, -.05, -.01, 1, 1.7, 1.25); add(ball, .115, -.05, -.01, 1, 1.7, 1.25); add(ball, 0, -.05, -.1, 1.9, 1.6, .9); }               // bob
+  else if (style === 1) { add(ball, 0, -.2, -.11, 1.9, 3.6, .8); add(ball, -.12, -.12, -.03, .8, 2.6, 1); add(ball, .12, -.12, -.03, .8, 2.6, 1); }              // long
+  else if (style === 2) { for (let j = 0; j < 7; j++) { const a = j / 7 * Math.PI * 2; add(cone, Math.sin(a) * .09, .14 + rand(k + j) * .03, Math.cos(a) * .08 - .02, 1, 1, 1, Math.cos(a) * .7, -Math.sin(a) * .7); } add(cone, 0, .19, -.01); }   // spiky
+  else if (style === 3) { add(ball, 0, .13, -.14, .9, .9, .9); add(ball, 0, -.02, -.2, .7, 2.6, .7, .35); }                                                    // ponytail
+  else if (style === 4) { add(ball, -.12, .13, -.03, .85, .85, .85); add(ball, .12, .13, -.03, .85, .85, .85); }                                               // twin buns
+  else { add(ball, 0, .06, -.05, 2.6, 1.9, 2.3); }                                                                                                             // big curls
+  return g;
+}
 const people = [];
-const SHIRTS = [0x2b2140, 0x1c2a44, 0x3a1d3a, 0x14323a, 0x40222c, 0x26263a, 0x4a2f1a];
 for (let i = 0; i < N; i++) {
   const row = Math.floor(i / 9), col = i % 9;
   const p = { x: (col - 4) * .92 + (rand(i) - .5) * .5 + (row % 2) * .4, z: -1.25 - row * .78 - rand(i + 50) * .3, h: .9 + rand(i + 9) * .22,
     ph: rand(i + 3) * 6.28, lively: .5 + rand(i + 7) * .5, phone: rand(i + 21) > .82, lean: (rand(i + 5) - .5) * .25 };
-  people.push(p);
-  const col3 = new THREE.Color(SHIRTS[Math.floor(rand(i + 11) * SHIRTS.length)]);
-  bodies.setColorAt(i, col3); heads.setColorAt(i, new THREE.Color().setHSL(.07 + rand(i + 13) * .04, .35, .32 + rand(i + 17) * .2));
-  arms.setColorAt(i * 2, col3); arms.setColorAt(i * 2 + 1, col3);
+  const skin = SKIN[Math.floor(rand(i + 13) * SKIN.length)], shirt = new THREE.Color(SHIRTS[Math.floor(rand(i + 11) * SHIRTS.length)]);
+  bodies.setColorAt(i, shirt); arms.setColorAt(i * 2, new THREE.Color(skin)); arms.setColorAt(i * 2 + 1, new THREE.Color(skin));
+  const head = new THREE.Group();
+  head.add(new THREE.Mesh(headGeo, toon(skin)));
+  const ft = faceTex.clone(); ft.repeat.set(1 / 8, 1 / 8); ft.offset.set((i % 8) / 8, 1 - (Math.floor(i / 8) + 1) / 8); ft.needsUpdate = true;
+  head.add(new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: ft, transparent: true, alphaTest: .02, color: 0x8f98c8 })));
+  const style = Math.floor(rand(i + 31) * 6), hairCol = HAIR[(Math.floor(rand(i + 37) * HAIR.length) + i) % HAIR.length];
+  head.add(makeHair(style, toon(hairCol, .6), i));
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.045, .05, .1, 8), toon(skin)); neck.position.y = -.15; head.add(neck);
+  head.scale.setScalar(1.12 + rand(i + 41) * .12);                                   // anime proportions: a slightly large head
+  scene.add(head); p.head = head; people.push(p);
 }
-scene.add(bodies, heads, arms, phones, eyes, mouths);
+scene.add(bodies, arms, phones, mouths);
 function poseCrowd(bar, sec, pulse) {
   const [, name, energy] = sec, beat = bar * 4, cheer = name === 'announce' ? 1 : 0;
   for (let i = 0; i < N; i++) {
@@ -190,14 +254,10 @@ function poseCrowd(bar, sec, pulse) {
     const sway = Math.sin(beat * Math.PI / 2 + p.ph) * .06;
     const y = p.h * .62 + jump;
     dummy.position.set(p.x + sway, y, p.z); dummy.rotation.set(0, 0, p.lean * .4 + sway * .8); dummy.scale.set(1, p.h, 1); dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(p.x + sway * 1.5, y + p.h * .62, p.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
-    const hx = p.x + sway * 1.5, hy = y + p.h * .62, look = Math.sin(bar * .6 + p.ph) * .25;                     // head centre, a little glance left and right
-    for (const side of [-1, 1]) {
-      dummy.position.set(hx + side * .047 + look * .03, hy + .018, p.z + .118); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1.35, .5); dummy.updateMatrix();
-      eyes.setMatrixAt(i * 2 + (side === 1 ? 1 : 0), dummy.matrix);
-    }
-    const open = Math.max(0, energy * p.lively + cheer * p.lively - .45) * (.5 + .5 * up);                          // shouting in the drops and the intro
-    dummy.position.set(hx + look * .03, hy - .05, p.z + .116); dummy.scale.set(1 + open * .3, .28 + open * 1.5, .4); dummy.updateMatrix(); mouths.setMatrixAt(i, dummy.matrix);
+    const hx = p.x + sway * 1.5, hy = y + p.h * .64, look = Math.sin(bar * .6 + p.ph) * .3;
+    p.head.position.set(hx, hy, p.z); p.head.rotation.set(-.08 - .1 * up * energy, look, sway * 1.2);              // nod on the beat, glance around
+    const open = Math.max(0, energy * p.lively + cheer * p.lively - .45) * (.5 + .5 * up), hs = p.head.scale.x;    // shouting in the drops and the intro
+    dummy.position.set(hx + Math.sin(look) * .13 * hs, hy - .058 * hs, p.z + Math.cos(look) * .128 * hs); dummy.rotation.set(0, look, 0); dummy.scale.set((1 + open * .3) * (open > .02 ? 1 : 0), .3 + open * 1.5, .4); dummy.updateMatrix(); mouths.setMatrixAt(i, dummy.matrix);
     // arms: down at low energy, pumping in the air when it kicks off; each person has their own threshold
     const wants = Math.min(1, Math.max(0, (energy + cheer * .5 + .25 * Math.sin(bar * .8 + p.ph) - (1 - p.lively) * .9) * 2.2));
     for (const side of [-1, 1]) {
@@ -210,11 +270,12 @@ function poseCrowd(bar, sec, pulse) {
     const showPhone = p.phone && (energy > .6 || cheer);
     dummy.position.set(p.x + sway + .26, showPhone ? y + p.h * .28 + .86 : -5, p.z + .08); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); phones.setMatrixAt(i, dummy.matrix);
   }
-  eyes.instanceMatrix.needsUpdate = mouths.instanceMatrix.needsUpdate = bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
+  mouths.instanceMatrix.needsUpdate = bodies.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
 }
 
 // ---------- lights ----------
 scene.add(new THREE.AmbientLight(0x5a4a86, 1.35));
+const crowdBlue = new THREE.DirectionalLight(0x3f7bff, .9); crowdBlue.position.set(-2, 5, 3); crowdBlue.target.position.set(0, 1, -3); scene.add(crowdBlue, crowdBlue.target);
 const key = new THREE.SpotLight(0xffe2d0, 14, 12, .42, .7, 1.2); key.position.set(.6, 3.6, 4.2); key.target.position.set(0, 1.3, 0); scene.add(key, key.target);
 const spots = [[PINK, -4.5], [CYAN, 4.5], [PINK, 2], [CYAN, -2]].map(([c, x]) => { const s = new THREE.SpotLight(c, 0, 16, .42, .7, 1); s.position.set(x, 5.2, -1.5); scene.add(s, s.target); return s; });
 const wash = new THREE.PointLight(PINK, 0, 14, 1.4); wash.position.set(0, 3.2, -3.4); scene.add(wash);
