@@ -1,4 +1,4 @@
-// 10 "Cyber Space Set" · announcer + crowd intro (12 bars), then "Wake Signal (Awake Mix)" · 126 BPM, 96 bars (~3:03)
+// 10 "Cyber Space Set" · announcer + crowd over the intro, then "Wake Signal (Awake Mix)" · 126 BPM, 104 bars (~3:20)
 // Built 2026-11-19 for the club-set video with Ash and Claudio. Announcer and crowd are our own designed voices.
 setcpm(126/4)
 // vocal packs: run tools/live/server.py (serves samples/ locally)
@@ -15,7 +15,7 @@ samples(Object.fromEntries(['ivebeen', 'waiting', 'forthis', 'forsucha', 'long',
 // the vocal: one sultry designed voice, two phrases (single quotes: double-quoted strings become patterns)
 samples({ sultry_six: ['sultry__six__s1.wav', 'sultry__six__s2.wav'], sultry_seven: ['sultry__seven__s1.wav', 'sultry__seven__s2.wav'],
   sultry_feelit: ['sultry__feelit__s1.wav', 'sultry__feelit__s2.wav'] }, 'http://localhost:4321/samples/house/')
-samples({ br_mc1: ['mc1__s42.wav'], br_mc2: ['mc2c__s42.wav'], br_crowd: ['crowd.wav'] }, 'http://localhost:4321/samples/mc/')
+samples({ br_mcall: ['mcall__s3.wav'], br_crowdmc: ['crowd_mc.wav'] }, 'http://localhost:4321/samples/mc/')   // the announcer in one run-on take, the crowd cut to his length
 
 const A = "<Fm9 Db^7 Ab^7 Eb>", Aroots = "<f1 db1 ab0 eb1>"
 const B = "<Db^7 Eb Fm9 Cm7 Db^7 Eb Ab^7 C7>", Broots = "<db1 eb1 f1 c1 db1 eb1 ab0 c1>"
@@ -85,26 +85,28 @@ const sing = s(`<
 const sixSeven = s("<[sultry_six ~ ~ ~ sultry_seven ~ ~ ~] ~ sultry_feelit ~!13>")   // once per 16 bars: six on 1, seven on 3, a bar of air, then the question (Joona: "appears too often")   // six on 1, seven on 3, a bar of air, then the question
   .room(.3).delay(.25).delaytime(3/8).delayfeedback(.35).gain(.85).orbit(6)
 
-// the announcer over a cheering crowd; the set starts on bar 13
+// the announcer in one run-on line over a crowd that is already cheering; the crowd stops when he does, and the song
+// is already playing under him (Joona, 2026-11-19)
 const announce = stack(
-  s("<br_crowd ~ ~ ~ ~ ~ br_crowd ~ ~ ~ ~ ~>").gain(.9).orbit(7),
-  s("<br_mc1 ~ ~ ~ ~ br_mc2 ~ ~ ~ ~ ~ ~>").gain(1.1).orbit(7),
-  plucks(.3, 1.2).gain(.3),
-  riser.early(4).mask("<0!8 1!4>"), roll.early(4).mask("<0!8 1!4>"))
+  s("<br_crowdmc ~!7>").gain(.85).orbit(7),
+  s("<br_mcall ~!7>").gain(1.15).orbit(7))
 
-// Joona, 2026-11-19: a structure rework (experiments/10b) was tried and rejected: "last version was better".
-// Kept from it: only the ear-to-ear drift of the plucks in the outro.
 arrange(
-  // about 3 minutes (Joona, 2026-11-19: "lets end it around 3 minutes"): 96 bars at 126 BPM = 3:03
-  [12, announce],
-  [8,  stack(plucks(1, 3.5), silence)],                                              // intro: plucks open up, no ticking hats
+  // about 3:20 (Joona: "I think the original was like 3 minutes, 19 seconds"): 104 bars at 126 BPM = 3:18 plus the last chord's tail
+  [8,  stack(announce, plucks(.6, 2.5))],                                            // the song starts under the announcer
+  [8,  stack(plucks(2, 3.8), silence)],                                              // intro: plucks open up
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],                 // build
   [8,  stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven)],                  // A: the line, first time
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],              // breakdown
   [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops.mask("<0!6 1!2>"))],   // drop: the line, second time
-  [8,  stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                            // B: Ash's dance
+  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                           // B: Ash's dance
   [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],   // bridge
   [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],   // final drop: third time
-  [4,  stack(kick.mask("<1 1 0 0>"), bass(Aroots).mask("<1 1 0 0>"), plucks(3, .3).pan(sine.range(.06, .94).slow(2)))],           // outro: ear to ear, out
+  // a clean ending: the groove thins over four bars, the plucks drift ear to ear and close, then one last hit on the home chord rings out
+  [8,  stack(kick.mask("<1 1 1 1 0 0 0 0>"), clap.mask("<1 1 0 0 0 0 0 0>"), hats.mask("<1 1 1 0 0 0 0 0>"), bass(Aroots).mask("<1 1 1 1 0 0 0 0>"),
+             plucks(3.5, .3).pan(sine.range(.06, .94).slow(2)).mask("<1!7 0>"), pad(A, 2400, 600).mask("<0 0 0 0 1 1 1 0>"),
+             chord("<~!7 Fm9>").voicing().s("supersaw").unison(5).spread(.8).lpf(2600).attack(.01).release(3.2).room(.6).gain(.32).orbit(2),
+             s("<~!7 bd>").bank("RolandTR909").shape(.25).gain(1.05).orbit(9), s("<~!7 cp>").bank("RolandTR909").room(.6).gain(.5))],
 )
+
 
