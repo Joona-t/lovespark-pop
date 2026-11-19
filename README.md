@@ -8,6 +8,12 @@ An open pop character and her music, made with local models only: no paid AI API
 
 See `research.md` for the findings and `plan.md` for the build order.
 
+## Watch it cook (live stream)
+```
+python3 tools/live/server.py
+```
+Open http://127.0.0.1:4321 and click **Start**. Every save of `patterns/live.strudel.js` plays in the page within a quarter second, over a beat-synced glyph-grid background. Strudel's own **Export to WAV** (strudel.cc, export tab) renders a finished pattern to audio.
+
 ## Layout
 - `patterns/` — Strudel patterns, one file per track (AGPL-3.0, see `patterns/LICENSE`).
 - `tools/` — render and pipeline scripts (MIT).
