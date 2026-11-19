@@ -228,6 +228,13 @@ function makeHair(style, mat, k) {                                              
   else { add(ball, 0, .06, -.05, 2.6, 1.9, 2.3); }                                                                                                             // big curls
   return g;
 }
+// the pink starburst on every shirt (Joona, 2026-11-19): drawn in code, one decal per dancer
+const lc = document.createElement('canvas'); lc.width = lc.height = 128; const lx = lc.getContext('2d');
+lx.translate(64, 64); lx.strokeStyle = '#ff5c7a'; lx.lineCap = 'round';
+const RAYS = [1, .78, .95, .7, 1, .82, .92, .74, 1, .8, .96, .72];
+RAYS.forEach((len, j) => { const a = j / RAYS.length * Math.PI * 2 + .13; lx.lineWidth = 11; lx.beginPath(); lx.moveTo(Math.cos(a) * 9, Math.sin(a) * 9); lx.lineTo(Math.cos(a) * 54 * len, Math.sin(a) * 54 * len); lx.stroke(); });
+const logoTex = new THREE.CanvasTexture(lc); logoTex.colorSpace = THREE.SRGBColorSpace;
+const logos = new THREE.InstancedMesh(new THREE.PlaneGeometry(.2, .2), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true, alphaTest: .3, color: 0xc8c8c8 }), N);
 const people = [];
 for (let i = 0; i < N; i++) {
   const row = Math.floor(i / 9), col = i % 9;
@@ -245,7 +252,7 @@ for (let i = 0; i < N; i++) {
   head.scale.setScalar(1.12 + rand(i + 41) * .12);                                   // anime proportions: a slightly large head
   scene.add(head); p.head = head; people.push(p);
 }
-scene.add(bodies, arms, phones, mouths);
+scene.add(bodies, arms, phones, mouths, logos);
 function poseCrowd(bar, sec, pulse) {
   const [, name, energy] = sec, beat = bar * 4, cheer = name === 'announce' ? 1 : 0;
   for (let i = 0; i < N; i++) {
@@ -254,6 +261,7 @@ function poseCrowd(bar, sec, pulse) {
     const sway = Math.sin(beat * Math.PI / 2 + p.ph) * .06;
     const y = p.h * .62 + jump;
     dummy.position.set(p.x + sway, y, p.z); dummy.rotation.set(0, 0, p.lean * .4 + sway * .8); dummy.scale.set(1, p.h, 1); dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(p.x + sway, y + p.h * .2, p.z + .192); dummy.rotation.set(0, 0, p.lean * .4 + sway * .8); dummy.scale.setScalar(1); dummy.updateMatrix(); logos.setMatrixAt(i, dummy.matrix);   // chest decal
     const hx = p.x + sway * 1.5, hy = y + p.h * .64, look = Math.sin(bar * .6 + p.ph) * .3;
     p.head.position.set(hx, hy, p.z); p.head.rotation.set(-.08 - .1 * up * energy, look, sway * 1.2);              // nod on the beat, glance around
     const open = Math.max(0, energy * p.lively + cheer * p.lively - .45) * (.5 + .5 * up), hs = p.head.scale.x;    // shouting in the drops and the intro
@@ -270,7 +278,7 @@ function poseCrowd(bar, sec, pulse) {
     const showPhone = p.phone && (energy > .6 || cheer);
     dummy.position.set(p.x + sway + .26, showPhone ? y + p.h * .28 + .86 : -5, p.z + .08); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); phones.setMatrixAt(i, dummy.matrix);
   }
-  mouths.instanceMatrix.needsUpdate = bodies.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
+  logos.instanceMatrix.needsUpdate = mouths.instanceMatrix.needsUpdate = bodies.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
 }
 
 // ---------- lights ----------

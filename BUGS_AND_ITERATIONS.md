@@ -108,3 +108,8 @@ Checked by screenshot close on the crowd and live with audio (no console errors)
 Still capsule bodies; real character bodies or generated 2D art are the next step if this direction holds.
 
 RSI: ~12 min, 1 look-fix round -> no loss worth fixing.
+
+## ITER-014 (2026-11-19): starburst on every shirt
+Joona: "this logo on all the peoples tshirt" (a pink starburst). Drawn in code (12 rounded rays) as one chest decal per dancer; checked by screenshot, no console errors. Open before anything public: the starburst is Claude's mark and belongs to Anthropic, like Claudio's look.
+
+RSI: ~4 min, 0 re-work -> no loss worth fixing.
