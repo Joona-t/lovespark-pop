@@ -198,3 +198,14 @@ RSI: ~15 min, 1 edit pass, 0 re-work -> no loss worth fixing (bone names and cli
 Commit 5531323 gave each of the 54 dancers its own skeleton and animation mixer (216 skinned parts, 216 bone updates a frame). Measured in the browser pane at 1024 x 768: 7 to 12 frames a second with the dancers, 34 with the capsule crowd. It was pushed before the frame rate was measured. Fix: dancers that share a body, a clip and a bar offset now share one hidden rig (14 rigs for 54 dancers); each dancer is a set of detached skinned meshes placed by its holder. Measured after: 28 to 29 frames a second, stills unchanged. Check: after a crowd change, count `club.frames` over 3 seconds with and without the change.
 
 RSI: ~10 min, 1 re-work -> top loss: a pushed commit at a third of the frame rate, because stills cannot show speed -> fix: frame rate is measured before committing any stage change that adds animated objects.
+
+## ITER-020 (2026-11-19): first full club video, rendered on the Forge
+Joona: "Render it". `tools/club/render_video.mjs` (Node + playwright-core) opens the club page in headless Chromium, puts it in offline mode (`club.offline`, `club.shot`: the page's own loop stops) and takes one frame per video frame at bar = t × 126/240, so picture and the master line up by construction. Each process warms up 90 frames before its range so hair and cloth physics have settled at the join.
+Forge: ANGLE on Vulkan reaches the NVIDIA cards (ANGLE on EGL fell back to the CPU's integrated graphics, 12.5 fps); `MESA_VK_DEVICE_SELECT=10de:2203` / `10de:2204` picks card 0 / card 1. Two halves at about 30 fps each, both cards at once: 7,618 frames in 127 s, beside the idle vLLM server (about 600 MB extra per card). Output `renders/cyber-space-set-v1.mp4`: 1920×1080, 30 fps, 253.93 s, -14 LUFS master, AAC 320k.
+Checked: frame count against audio length, a 12-frame contact sheet across every section, frames 3807-3810 across the join (no jump).
+
+## BUG-007 (2026-11-19): neon signs drew in a plain serif on the Forge
+Root cause: the sign font list was macOS-only (Brush Script MT, Snell Roundhand); Linux has neither and fell back to serif. Fix: Yellowtail (OFL, Google Fonts) first, loaded before the signs are drawn. Mac and Forge now match.
+Open: on the first bar of the drop (bar 61) Ash flashes almost pure white for a moment.
+
+RSI: ~15 min wall, 127 s render -> top loss: 3 dead ends setting up the Forge (Python 3.14 with no pip, the .md copy rule, EGL on the wrong GPU) -> fix: the Node renderer and its flags are in the repo, so the next render is one rsync and two commands.

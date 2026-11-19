@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyber Space Club</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=block" rel="stylesheet">
 <script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
 <script type="importmap">
 { "imports": {
@@ -35,6 +37,8 @@
 --></strudel-editor>
 
 <script type="module">
+// the neon signs use Yellowtail (open licence, Google Fonts): the Mac-only script fonts were missing on the Forge, which drew the signs in a plain serif
+try { await Promise.race([document.fonts.load('100px Yellowtail'), new Promise((r) => setTimeout(r, 5000))]); } catch {}
 // The club: a Three.js stage driven by the set's own clock (bars), so every light, bounce and cut lands on the music.
 // ?bar=60 previews a position without audio (also the hook for rendering frames later: window.club.setBar(x)).
 import * as THREE from 'three';
@@ -67,7 +71,8 @@ const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .45, .93); composer.addPass(bloom);
 composer.addPass(new OutputPass());
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+let offline = false;                                 // video render: the page's own loop stops and frames are taken on demand
+function resize() { if (offline) return; const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
 // ---------- room ----------
@@ -110,7 +115,7 @@ function neonCanvas(w, h, draw) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 const neonText = (x, text, cx, cy, size, color, core) => {
-  x.font = `italic 700 ${size}px "Brush Script MT", "Snell Roundhand", "Segoe Script", cursive`;
+  x.font = `${size}px Yellowtail, "Brush Script MT", "Snell Roundhand", cursive`;
   x.shadowColor = color; x.strokeStyle = core ? '#fff7fb' : color; x.lineWidth = core ? size * .035 : size * .09; x.strokeText(text, cx, cy);
 };
 const signs = [];
@@ -674,6 +679,10 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
 }
 window.club = { still, POSE, moves, dancers, rigs, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
   resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
+// ---------- video render (tools/club/render_video.py): fixed size, one frame per call at an exact bar position ----------
+window.club.offline = (w, h) => { offline = true; renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+window.club.shot = (bar, dt, q = .93) => { frame(bar, dt); return canvas.toDataURL('image/jpeg', q); };
+window.club.ready = () => ({ ash: !!ash, mc: !!mc, claudios: claudios.filter((c) => c.vrm).length, moves: Object.keys(moves).length, dancers: dancers.length ?? Object.keys(dancers).length });
 if (fake) document.getElementById('go').remove();
 document.getElementById('start')?.addEventListener('click', async () => {
   const btn = document.getElementById('start'); btn.textContent = 'LOADING…';
@@ -733,7 +742,7 @@ muteBtn.addEventListener('click', toggleSound);
 addEventListener('keydown', (e) => { if (e.key === 'm' || e.key === 'M') toggleSound(); });
 applySound();
 let last = performance.now();
-(function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(barNow(), dt); window.club.frames++; requestAnimationFrame(loop); })(last);
+(function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; if (!offline) frame(barNow(), dt); window.club.frames++; requestAnimationFrame(loop); })(last);
 </script>
 </body>
 </html>
