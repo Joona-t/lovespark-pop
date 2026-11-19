@@ -183,3 +183,13 @@ RSI: ~75 min, 3 pose rounds, 3 mix-script reruns -> top loss: all earlier listen
 Checked in a second tab by screenshot: Lime at bars 80.3, 84.6, 86.5 (the arms-out pose matches the PC's own render of that moment; her upper-arm rotation changes across five sampled bars), MC Spark at bars 3.3 and 66.5; then live in his tab: playing, both moves loaded, 7 Claudios, no console errors. Not checked: the cut into and out of the dance at bars 77 and 93 in motion, a full run.
 
 RSI: ~20 min, 0 re-work -> no loss worth fixing (the skeletons matched on the first try because the moves and the VRMs come from the same Blender files).
+
+## ITER-021 (2026-11-19): full-body dancers and a fluid Ash on the stage
+- Joona: "It's a little bit boring right now ... let's have the movement of Ash be a little more fluid. Maybe some of the background characters come closer and dance as well. Like a proper ballroom set ... the people in the back, they have their arms connected and they have legs". After a 16-bar Blender preview: "Yes, put on stage".
+- Ash's dance in the B section now plays `lime_dance_fluid.glb` (ashley-pc `kpop/club-set/fluid.py`): keyed every 2nd frame from the beat clock with a delay per joint, where the older `lime_dance.glb` held one pose per beat.
+- The capsule crowd is replaced by 54 skinned dancers from `models/anim/dancers/dancer_lead.glb` and `dancer_follow.glb` (ashley-pc `kpop/club-set/crowd.py`, about 270 KB each): joined arms, legs, a bell skirt on the follower. The front two rows form 8 couples in a ballroom hold that turn once every 8 bars; the other 38 dance solo. Each dancer keeps its drawn head, hair and shirt starburst. Everyone moves up to 0.3 m toward the booth with the section's energy. Four bars of clip are mapped onto four bars of music, so a clip cannot drift off the beat.
+- If the dancer files are missing (`models/` is local), the capsule crowd is shown as before.
+- Lost for now: the phones some of the crowd held up. The DJ-at-the-decks poses are unchanged (the code poses carry the six-seven emote and its riders).
+Checked in a second tab by four stills (`renders/stage-dancers-high-62.png`, `stage-dancers-side-62.png`, `stage-ash-dance-80.png`, `stage-ash-dance-83.png`) and by reading back `club.dancers.length` = 54 with 16 paired, both moves loaded. Not checked: playback in motion, frame rate with 54 skinned dancers, phone and tablet widths.
+
+RSI: ~15 min, 1 edit pass, 0 re-work -> no loss worth fixing (bone names and clip names came from the script that exported them).
