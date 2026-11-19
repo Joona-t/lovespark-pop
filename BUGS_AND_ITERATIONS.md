@@ -209,3 +209,10 @@ Root cause: the sign font list was macOS-only (Brush Script MT, Snell Roundhand)
 Open: on the first bar of the drop (bar 61) Ash flashes almost pure white for a moment.
 
 RSI: ~15 min wall, 127 s render -> top loss: 3 dead ends setting up the Forge (Python 3.14 with no pip, the .md copy rule, EGL on the wrong GPU) -> fix: the Node renderer and its flags are in the repo, so the next render is one rsync and two commands.
+
+## ITER-022 (2026-11-19): the fluid DJ move at the decks, with the pumps and the six-seven on top
+Joona, on the new clips from ashley-pc: "Yes, wire them in". By then other sessions had already put the full-body dancers and the fluid B-section dance on the stage (ITER-021), so the piece left was `lime_dj_fluid.glb` (16 bars at 126 BPM: cueing, scratching, riding the fader). Outside the announcer intro and the B-section her body now comes from that move, looped from bar 13 so it stays in phase with the 8-bar sections. The code pose is still computed every frame and written to the skeleton first; the move is laid over it, and each arm (shoulder to fingertips) is blended back toward the code pose by how much that arm is pumping or doing the six-seven. So the fist pumps, the emote and the two Claudios riding her hands are unchanged.
+Checked by screenshot: hands on the mixer at bars 38.3 and 41.6 (front and side), right fist up at 65.5, emote at 61.0 with both riders at her palm positions (read back numerically). No new console errors. Not checked: frame rate with the extra skeleton update, the move in motion, a full run.
+A first try stored the bone list on `vrm.userData`, which a VRM object does not have; caught on the first render call.
+
+RSI: ~12 min, 1 re-run -> top loss: ~4 min rediscovering that other sessions had already wired the dancers and the fluid dance -> fix: read `git log` and the tail of this file before planning a change to a shared file.

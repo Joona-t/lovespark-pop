@@ -48,6 +48,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 132;
@@ -69,6 +70,11 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05030a); s
 const camera = new THREE.PerspectiveCamera(38, 1, .1, 60);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
+// Before bloom: drop NaN/Inf pixels and cap brightness. On the Forge (ANGLE on Vulkan, NVIDIA) a single runaway highlight
+// on Ash's visor came out as Inf and the bloom spread it over her whole body as a white flash (1.7% of the frame pure white).
+composer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); vec3 r = c.rgb; if (any(isnan(r)) || any(isinf(r))) r = vec3(0.0); gl_FragColor = vec4(clamp(r, 0.0, 4.0), c.a); }' }));
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .45, .93); composer.addPass(bloom);
 composer.addPass(new OutputPass());
 let offline = false;                                 // video render: the page's own loop stops and frames are taken on demand
@@ -445,7 +451,7 @@ function loadMove(name, file) {
     moves[name] = { clip: new THREE.AnimationClip(name, src.duration, tracks), mixer: null, root: null };
   }, undefined, () => console.warn('move not found (code poses are used instead): ' + name));
 }
-loadMove('lime_dance', 'lime_dance_fluid.glb'); loadMove('mc_dance', 'mc_dance.glb');   // lime_dance_fluid: kpop/club-set/fluid.py, every joint follows the beat clock with its own delay (the older lime_dance.glb held one pose per beat)
+loadMove('lime_dance', 'lime_dance_fluid.glb'); loadMove('mc_dance', 'mc_dance.glb'); loadMove('lime_dj', 'lime_dj_fluid.glb');   // lime_dance_fluid: kpop/club-set/fluid.py, every joint follows the beat clock with its own delay (the older lime_dance.glb held one pose per beat)
 function playMove(name, vrm, seconds) {               // pose the model from the move at this time; false if it is not loaded
   const mv = moves[name]; if (!mv || !vrm) return false;
   if (mv.root !== vrm.scene) { mv.mixer = new THREE.AnimationMixer(vrm.scene); mv.mixer.clipAction(mv.clip).play(); mv.root = vrm.scene; }
@@ -531,6 +537,7 @@ function pumpAt(bar, sec) {
   else if (energy >= .7 && k === 3) R = env;
   return { L, R };
 }
+let ashArms = null;                                  // her arm and finger bones, found once
 function poseAsh(bar, sec, pulse, dt) {
   if (!ash) return;
   const emo = emoteAt(bar), pump = pumpAt(bar, sec);
@@ -562,6 +569,17 @@ function poseAsh(bar, sec, pulse, dt) {
     curl(b, side, Math.max(p, .18 * (1 - w)) * (1 - emo.e));
   }
   ash.expressionManager?.setValue('happy', Math.max(emo.e * .8, Math.max(pump.L, pump.R) * .5));
+  // At the decks her body comes from the fluid DJ move made in Blender (16 bars: cueing, scratching, riding the fader).
+  // The code pose above still supplies an arm whenever it pumps or does the six-seven: it is written to the skeleton
+  // first, the move is laid over it, and each arm is blended back toward the code pose by how much that arm is asked for.
+  if (name !== 'announce' && moves.lime_dj) {
+    const arm = (ashArms ??= (() => { const L = [], R = []; ash.scene.traverse((o) => {
+      const m = /^J_Bip_([LR])_(?!UpperLeg|LowerLeg|Foot|ToeBase)/.exec(o.name); if (m) (m[1] === 'L' ? L : R).push({ node: o, q: new THREE.Quaternion() }); }); return { L, R }; })());
+    h.update();
+    for (const side of ['L', 'R']) for (const a of arm[side]) a.q.copy(a.node.quaternion);
+    playMove('lime_dj', ash, (bar - 12) * BAR_SEC);
+    for (const side of ['L', 'R']) { const w = Math.max(side === 'L' ? pump.L : pump.R, emo.e); if (w > 0) for (const a of arm[side]) a.node.quaternion.slerp(a.q, w); }
+  }
   if (!settled) { ash.springBoneManager?.reset(); settled = true; }   // hair starts from the posed body, not the T-pose
   ash.update(dt);
   ash.scene.updateMatrixWorld(true);
