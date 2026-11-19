@@ -216,3 +216,12 @@ Checked by screenshot: hands on the mixer at bars 38.3 and 41.6 (front and side)
 A first try stored the bone list on `vrm.userData`, which a VRM object does not have; caught on the first render call.
 
 RSI: ~12 min, 1 re-run -> top loss: ~4 min rediscovering that other sessions had already wired the dancers and the fluid dance -> fix: read `git log` and the tail of this file before planning a change to a shared file.
+
+## BUG-008 (2026-11-19): Ash flashed white in the drops (video v1)
+Measured over the whole video (share of each frame at or above 240 on all channels): two stretches, 122.9-128.7 s and 210.5-214.8 s, up to 1.7% of the frame. Root cause: the five floor glows had a 5 m range and the scene has no shadows, so they lit Ash through the booth. When she leant over the mixer her white suit faced them, crossed the bloom threshold, and the drop's stronger bloom spread it over her. Proven on a fresh page each run: bloom off gave 0%; floor-glow range 1.4 m gave 0% at the worst frame (3700), against 1.03% before. Dead ends, kept so they are not tried again: it is not the Forge driver (the Mac reproduced it with the same 100 frames of history), not NaN/Inf (a clamp pass changed nothing), not her LEDs' emissive, and not her base colour alone (.45 still gave 0.67%). The light-by-light test only became reliable once each run used a fresh page: state carries over between runs.
+Video v2: 0 frames over 0.5% white (v1: 19), highest 0.19%.
+
+## ITER-021 (2026-11-19): Ash dances in the intro; the Claudios circle her
+Joona: "we need ash to dance more in the ebeginning have the claudios also dance and circle her at some point". Ash steps off the decks to dance through the second intro and the build (bars 21-36, one dance clock so the move does not restart at the build), and in the half-time bridge at half speed, as well as in B. The second intro opens on the close shot. In the bridge (bars 93-100) all seven Claudios fly in over one bar, orbit her at chest height a quarter turn per bar, hopping on every beat and spinning every half bar, and fly home in the last bar before the final drop; the camera is in front for four bars, then high. Previewed at 12 frames before the render; video v2 rendered on both Forge GPUs (125 s and 126 s).
+
+RSI: ~1 h -> top loss: chasing a driver bug for 4 runs because the first light test reused page state between runs -> fix: diagnostics on the stage use a fresh page per variant, written up above.
