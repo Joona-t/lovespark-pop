@@ -325,30 +325,39 @@ for (const kind of ['lead', 'follow']) {
   new GLTFLoader().load(`/models/anim/dancers/dancer_${kind}.glb`, (g) => { dancerSrc[kind] = g; if (dancerSrc.lead && dancerSrc.follow) buildDancers(); },
     undefined, () => console.warn('dancer model not found (the capsule crowd is used instead): ' + kind));
 }
+const rigs = {};                                     // one animated skeleton per (body, clip, bar offset); its dancers share it
+function rigFor(kind, clipName, phase) {
+  const key = kind + clipName + phase; if (rigs[key]) return rigs[key];
+  const src = dancerSrc[kind], clip = THREE.AnimationClip.findByName(src.animations, clipName); if (!clip) return null;
+  const root = SkeletonUtils.clone(src.scene), parts = [];
+  root.traverse((o) => { if (o.isSkinnedMesh) { parts.push(o); o.visible = false; } });      // the rig itself is never drawn
+  const mixer = new THREE.AnimationMixer(root); mixer.clipAction(clip).play(); scene.add(root);
+  return (rigs[key] = { root, parts, mixer, dur: clip.duration, phase, head: root.getObjectByName('head'), chest: root.getObjectByName('chest') });
+}
 function buildDancers() {
   for (let i = 0; i < N; i++) {
     const p = people[i], row = Math.floor(i / 9), col = i % 9, paired = row < COUPLE_ROWS && col < 8;   // 4 couples in each front row
     const kind = paired ? (col % 2 ? 'follow' : 'lead') : (rand(i + 61) > .5 ? 'follow' : 'lead');
-    const src = dancerSrc[kind], clip = THREE.AnimationClip.findByName(src.animations, paired ? 'couple' : 'solo');
-    if (!clip) { console.warn('dancer clip missing: ' + kind); return; }
-    const root = SkeletonUtils.clone(src.scene);
+    const q = paired ? people[i - (col % 2)] : p, rig = rigFor(kind, paired ? 'couple' : 'solo', Math.floor(q.ph) % 4);
+    if (!rig) { console.warn('dancer clip missing: ' + kind); dancers.length = 0; return; }
     const bottom = kind === 'follow' ? SHIRTS[(Math.floor(rand(i + 11) * SHIRTS.length) + 3) % SHIRTS.length] : BOTTOMS[Math.floor(rand(i + 67) * BOTTOMS.length)];
-    root.traverse((o) => {
-      if (!o.isSkinnedMesh) return;
-      o.frustumCulled = false; const n = o.material.name;
-      if (n.startsWith('hair')) { o.visible = false; return; }          // the drawn head and its hair cover this one
-      o.material = toon(n.startsWith('skin') ? p.skin : n.startsWith('top') ? p.shirt : n.startsWith('bottom') ? bottom : 0x2a2a38);
-      dancerMats.push(o.material);
-    });
-    const mixer = new THREE.AnimationMixer(root); mixer.clipAction(clip).play();
-    const holder = new THREE.Group(); holder.add(root); scene.add(holder);
-    dancers.push({ p, q: paired ? people[i - (col % 2)] : p, mate: paired ? people[i - (col % 2) + 1] : null, holder, mixer, dur: clip.duration, paired,
-      flip: paired && kind === 'follow', head: root.getObjectByName('head'), chest: root.getObjectByName('chest') });
+    const holder = new THREE.Group();
+    for (const part of rig.parts) {
+      const n = part.material.name; if (n.startsWith('hair')) continue;                     // the drawn head and its hair cover this one
+      const mat = toon(n.startsWith('skin') ? p.skin : n.startsWith('top') ? p.shirt : n.startsWith('bottom') ? bottom : 0x2a2a38);
+      const m = new THREE.SkinnedMesh(part.geometry, mat); m.bindMode = 'detached'; m.bind(part.skeleton, part.bindMatrix);
+      m.frustumCulled = false; holder.add(m); dancerMats.push(mat);                         // detached: the shared bones pose it, the holder places it
+    }
+    scene.add(holder);
+    dancers.push({ p, q, mate: paired ? people[i - (col % 2) + 1] : null, holder, rig, paired, flip: paired && kind === 'follow', idx: i });
   }
 }
 function poseDancers(bar, sec, pulse) {
   const [, name, energy] = sec, beat = bar * 4, cheer = name === 'announce' ? 1 : 0;
   bodies.visible = arms.visible = phones.visible = false;
+  for (const k in rigs) {                                               // 4 bars of clip = 4 bars of music, so it never drifts off the beat
+    const r = rigs[k]; r.mixer.setTime(((((bar + r.phase) % 4) + 4) % 4) / 4 * r.dur); r.root.updateMatrixWorld(true);
+  }
   for (const d of dancers) {
     const p = d.p, q = d.q, up = Math.abs(Math.sin(beat * Math.PI + q.ph * .25));
     const s = .86 * q.h, closer = .3 * energy;                         // everyone presses toward the booth when it kicks off
@@ -357,18 +366,16 @@ function poseDancers(bar, sec, pulse) {
       const a = q.ph + bar * Math.PI / 4 * (q.lively > .75 ? -1 : 1);
       x = (q.x + d.mate.x) / 2 + Math.sin(a * .5) * .16; z += Math.cos(a * .5) * .14; yaw = a;
     }
-    d.holder.position.set(x, 0, Math.min(-1.2, z)); d.holder.rotation.y = yaw; d.holder.scale.setScalar(s);
-    d.mixer.setTime(((((bar + Math.floor(q.ph)) % 4) + 4) % 4) / 4 * d.dur);   // 4 bars of clip = 4 bars of music, so it never drifts off the beat
-    d.holder.updateMatrixWorld(true);
+    d.holder.position.set(x, 0, Math.min(-1.2, z)); d.holder.rotation.y = yaw; d.holder.scale.setScalar(s); d.holder.updateMatrix();
     const face = yaw + (d.flip ? Math.PI : 0), look = Math.sin(bar * .6 + p.ph) * .3, f = face + look, hs = p.head.scale.x;
-    d.head.getWorldPosition(_hp); const hx = _hp.x, hy = _hp.y + .115 * s, hz = _hp.z;
+    _hp.setFromMatrixPosition(d.rig.head.matrixWorld).applyMatrix4(d.holder.matrix); const hx = _hp.x, hy = _hp.y + .115 * s, hz = _hp.z;
     p.head.position.set(hx, hy, hz); p.head.rotation.set(-.08 - .1 * up * energy, f, 0);
     const open = Math.max(0, energy * p.lively + cheer * p.lively - .45) * (.5 + .5 * up);
     dummy.position.set(hx + Math.sin(f) * .13 * hs, hy - .058 * hs, hz + Math.cos(f) * .128 * hs); dummy.rotation.set(0, f, 0);
-    dummy.scale.set((1 + open * .3) * (open > .02 ? 1 : 0), .3 + open * 1.5, .4); dummy.updateMatrix(); mouths.setMatrixAt(people.indexOf(p), dummy.matrix);
-    d.chest.getWorldPosition(_hp);                                      // the shirt starburst, on the chest
+    dummy.scale.set((1 + open * .3) * (open > .02 ? 1 : 0), .3 + open * 1.5, .4); dummy.updateMatrix(); mouths.setMatrixAt(d.idx, dummy.matrix);
+    _hp.setFromMatrixPosition(d.rig.chest.matrixWorld).applyMatrix4(d.holder.matrix);       // the shirt starburst, on the chest
     dummy.position.set(_hp.x + Math.sin(face) * .112 * s, _hp.y + .09 * s, _hp.z + Math.cos(face) * .112 * s); dummy.rotation.set(0, face, 0);
-    dummy.scale.setScalar(.8 * s); dummy.updateMatrix(); logos.setMatrixAt(people.indexOf(p), dummy.matrix);
+    dummy.scale.setScalar(.8 * s); dummy.updateMatrix(); logos.setMatrixAt(d.idx, dummy.matrix);
   }
   logos.instanceMatrix.needsUpdate = mouths.instanceMatrix.needsUpdate = true;
 }
@@ -665,7 +672,7 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }
-window.club = { still, POSE, moves, dancers, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
+window.club = { still, POSE, moves, dancers, rigs, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
   resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
 if (fake) document.getElementById('go').remove();
 document.getElementById('start')?.addEventListener('click', async () => {
