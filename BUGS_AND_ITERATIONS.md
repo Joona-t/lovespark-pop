@@ -37,3 +37,20 @@ Joona liked 06 and asked to develop it. 120 bars (~3:49): intro 16 (toms enter a
 Also: the Claudio 3D brief went to Ashley PC (`C:\ashley\kpop\claudio\BRIEF.md`).
 
 RSI: ~20 min, 0 re-work -> top loss: copying long code into the check by hand (3 kB per check) -> fix: none yet; when a fourth track needs it, add a `tools/check_track.js` that loads a file and prints bars per section.
+
+## ITER-006 (2026-11-19): "Wake Signal (Awake Mix)" (09): sidechain, a real lead, a B-section, Rose singing
+Joona: "take this to the next level"; then vocals from our voice models, and a faint pitched sung line ("I've been waiting for this... for such a long time / ... for all of my life") tuned to the song.
+- Real sidechain: the kick ducks the music bus (`duckorbit`), sub under the bass, filter-envelope plucks, Fm9.
+- Lead: 8-bar question and answer on an FM bell with octave echoes. B-section on new chords ending on C7. Half-time bridge.
+- Rose (Qwen3-TTS, ashley-pc GPU; the Forge was busy with AI Psychosis thumbnails): 20 one-shots, all words confirmed by speech recognition; 42 takes of the sung line's phrases, 9 chosen.
+- `tools/sing.py`: WORLD hard-tune. Measured on each note's own frames: all 15 notes within 8 cents except the tail of "this" (-24). Both full lines transcribe exactly after tuning.
+- Verified on the scheduler's pattern while playing: 14 section checkpoints, sung line in break, drop, bridge and final drop, no sample load errors. Not yet heard to the end by Joona.
+- Voice files are NOT in the repo (publishing them is Joona's call); the live server serves `samples/` locally.
+
+## BUG-004 (2026-11-19): two-note phrases came out up to 61 cents off
+Root cause: natural pitch movement was kept around the whole phrase's median, so a falling word put its first note sharp and its second flat. Fix: centre each note's frames on that note's own median. Check: `sing.py` prints cents off per note, measured on the frames assigned to it.
+
+## BUG-005 (2026-11-19): `.gain()` after `.off()` made the echoes as loud as the notes
+Root cause: a later `.gain` overrides the gain set inside `off`. Fix: set the main gain before `.off`. Caught by reading event gains off the playing pattern.
+
+RSI: ~70 min, 4 detours (no ASR/vocoder ready on the Mac, blocked publish, 2 tuning fixes) -> top loss: finding a working voice + ASR + vocoder route from scratch (~25 min) -> fix: `tools/sing.py` and the venv now exist; the route (ashley-pc qwen env, venv-asr) is written in the brain note.

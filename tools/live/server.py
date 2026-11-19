@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = Path(__file__).with_name("index.html")
+SAMPLES = (ROOT / "samples").resolve()
 
 
 def main():
@@ -53,6 +54,18 @@ def main():
                         time.sleep(0.25)
                 except (BrokenPipeError, ConnectionResetError):
                     return
+            elif self.path.startswith("/samples/"):
+                # our own sample packs, served to the page only (same origin)
+                f = (ROOT / self.path.lstrip("/").split("?")[0]).resolve()
+                if SAMPLES in f.parents and f.is_file() and f.suffix in (".wav", ".json"):
+                    body = f.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "audio/wav" if f.suffix == ".wav" else "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self.send_error(404)
             else:
                 self.send_error(404)
 

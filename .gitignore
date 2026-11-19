@@ -8,3 +8,5 @@ renders/
 *.flac
 *.mp4
 *.safetensors
+.venv/
+work_sing/
