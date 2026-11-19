@@ -109,9 +109,9 @@ const announce = stack(
 
 arrange(
   [12, announce],
-  // intro: plucks alone, then toms and the first distant vocal
-  [8,  stack(plucks(.5, 2), hats.gain(.3))],
-  [8,  stack(plucks(2, 3.5, SYNC), hats.gain(.3), rim, toms.gain(.2), far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"), upl)],
+  // intro: plucks alone (no ticking hats or rim), then toms and the first distant vocal
+  [8,  stack(plucks(.5, 2), silence)],                                              // no lone hats: they ticked like a metronome (Joona)
+  [8,  stack(plucks(2, 3.5, SYNC), toms.gain(.2), far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"), upl)],
   // build: kick and bass under the syncopated plucks
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4, SYNC), upl)],
   // A: 8 bars of groove with the lead held back and filtered, then it opens with open hats, shaker and the vocal
@@ -132,6 +132,6 @@ arrange(
              toms.mask("<0!8 1!8>"), pad(A, 3000, 4500), leadVar, leadHigh, sixSeven, chops.mask("<0!6 1!2>"), hey, upl)],
   // outro: the plucks start drifting between the ears, wider as everything else leaves
   [8,  stack(kick, hats, bass(Aroots), plucks(4, 2).pan(sine.range(.2, .8).slow(2)), far("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~ ~ ~ ~ ~>"))],
-  [8,  stack(hats.gain(.3), plucks(2, .3, SYNC).pan(sine.range(.04, .96).slow(2)).phaser(.5), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>").pan(sine.range(.2, .8).slow(4)))],
+  [8,  stack(plucks(2, .3, SYNC).pan(sine.range(.04, .96).slow(2)).phaser(.5), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>").pan(sine.range(.2, .8).slow(4)))],
 )
 
