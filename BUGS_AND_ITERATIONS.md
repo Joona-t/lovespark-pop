@@ -144,3 +144,8 @@ Lesson: the rework changed about ten things in one pass, so one "worse" from him
 `POST /save/<name>` wrote files with no origin check, so any page open in the same browser could have posted to it. Now: Origin must be this server's own address, a custom `X-Club-Save: 1` header is required (a cross-site form cannot send it), and the body is streamed to disk. Checked: a POST without the header returns 403.
 
 RSI: ~35 min on a rework that was reverted -> top loss: ten musical changes in one pass against a listener who judges by ear -> fix: one change per listen, announced before he hears it.
+
+## ITER-018 (2026-11-19): "hey" removed
+Joona: "this song is good almost remove the hey". Out of 09 and 10 (0 events over 132 bars on the playing pattern; sample and pattern line kept). Voice samples stay off the public repo (Joona: "no public repo for this").
+
+RSI: ~3 min, 0 re-work -> no loss worth fixing.
