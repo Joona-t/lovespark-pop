@@ -277,3 +277,13 @@ The first v6 capture had the kick and drum buses silent for bars 97-99 and 103-1
 The Mac had 790 MB free; the capture's appends failed a minute in and my wait loop (no time limit, a size threshold the file never reached) sat for 17 minutes. Fix: waits have a limit and report the length; old stem captures are deleted once a master is made (takes 4 to 8 removed, 2.4 GB+).
 
 RSI: ~50 min for a fade, 2 failed captures -> top loss: 17 min of unbounded waiting on a full disk -> fix: bounded waits, a disk check before a capture, and the kick gate.
+
+## ITER-027 (2026-11-19): video v7: 2:40, the Claudios circle Ash through her dance, hair behind the goggles, three review passes
+Joona on v6: "at 1:47 the claudios should circle lime ash and her hair clips through the goggles do multiple passes of the video fixing the small things", then "2:30 is a good length for the track maybe 2:45".
+- **Length:** 84 bars, 2:40 (B-section, final drop and the second half of the intro shortened). Sections, the six-seven bars (21, 37, 69), dances, ring, picture fade, `render_video.mjs` and `mix.py` all moved. Master from a fresh stem capture (pane visible): -14.2 LUFS, -1.4 dBTP, kick gate clean (only the expected fill, breakdown and half-time bars).
+- **Ring:** from the start of her dance (bar 53, about 1:39 in the new timing) through the bridge; the first 4 bars of the dance are shot from above so the circle reads.
+- **Goggles:** the lens and frame are pushed 7 mm out along their normals and win near depth ties (polygon offset); her bangs stay behind the lens in all seven close-ups checked.
+- **Review passes:** (1) 24 frames across the video in the render's own camera path: the ring was too small in the wide shot (fixed above); (2) 15 close-ups (face, ring from above, the six-seven): found the tongue and wink could carry into a dance that starts right after a six-seven (the dance path never reset them); fixed; (3) 18 frames of the final Forge render.
+- Render on both Forge cards: 4,800 frames, 89 and 90 s; `renders/cyber-space-set-v7.mp4`.
+
+RSI: ~45 min, 1 slow review render (6 min in a throttled pane) -> top loss: the close-up review ran in the browser pane at about 1 frame per 0.8 s -> fix: next time, render review frames on the Forge with the same renderer (render_video.mjs takes any frame range).

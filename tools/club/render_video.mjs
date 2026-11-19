@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
-const BPM = 126, BARS = 104, WARM = 90;
+const BPM = 126, BARS = 84, WARM = 90;
 const [f0, f1] = arg('frames').split(':').map(Number), fps = +arg('fps', 30), [w, h] = arg('size', '1920x1080').split('x').map(Number);
 const out = arg('out'), base = arg('base', 'http://127.0.0.1:4321'), gl = arg('gl', 'angle-vulkan');
 const barAt = (i) => Math.min(i / fps * BPM / 240, BARS - 1e-3);

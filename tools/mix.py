@@ -15,9 +15,9 @@ import json, re, subprocess, sys
 import numpy as np
 
 RAW, OUT = sys.argv[1], sys.argv[2]
-SR, N, BPM, BARS, FIRST_KICK_BAR = 44100, 18, 126, 104, 8
+SR, N, BPM, BARS, FIRST_KICK_BAR = 44100, 18, 126, 84, 8
 BAR = 240.0 / BPM
-FADE_FROM_BAR = 96                                   # the outro starts here (0-based); the music fades from this bar to the end
+FADE_FROM_BAR = 76                                   # the outro starts here (0-based); the music fades from this bar to the end
 LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "bass": (5, 1), "music": (6, 2), "lead": (8, 2),
        "chops": (10, 2), "far": (12, 2), "line": (14, 2), "mc": (16, 2)}
 db = lambda v: -200.0 if v <= 0 else 20 * np.log10(v)

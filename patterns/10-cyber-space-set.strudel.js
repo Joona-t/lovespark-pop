@@ -1,4 +1,4 @@
-// 10 "Cyber Space Set" · announcer + crowd over the intro, then "Wake Signal (Awake Mix)" · 126 BPM, 104 bars (~3:20)
+// 10 "Cyber Space Set" · announcer + crowd over the intro, then "Wake Signal (Awake Mix)" · 126 BPM, 84 bars (~2:40)
 // Built 2026-11-19 for the club-set video with Ash and Claudio. Announcer and crowd are our own designed voices.
 setcpm(126/4)
 // vocal packs: run tools/live/server.py (serves samples/ locally)
@@ -92,19 +92,18 @@ const announce = stack(
   s("<br_mcall ~!7>").gain(1.15).orbit(7))
 
 arrange(
-  // about 3:20 (Joona: "I think the original was like 3 minutes, 19 seconds"): 104 bars at 126 BPM = 3:18 plus the last chord's tail
+  // about 2:40 (Joona, 2026-11-19: "2:30 is a good length for the track maybe 2:45"): 84 bars at 126 BPM, the last 8 fading out
   [8,  stack(announce, plucks(.6, 2.5))],                                            // the song starts under the announcer
-  [8,  stack(kick, plucks(2, 3.8), hats.mask("<0!4 1!4>"))],                          // intro: the kick comes in first, on its own (Joona: "add the kick at like the beginning"), hats after four bars
+  [4,  stack(kick, plucks(2, 3.8), hats.mask("<0 0 1 1>"))],                         // the kick comes in on its own, hats after two bars
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],                 // build
   [8,  stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven)],                  // A: the line, first time
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],              // breakdown
   [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops.mask("<0!6 1!2>"))],   // drop: the line, second time
-  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                           // B: Ash's dance
+  [8,  stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                           // B: Ash's dance, the Claudios circle her
   [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],   // bridge
-  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],   // final drop: third time
-  // the ending (Joona: "don't have that stuttering at the end. Just lower it down ... fade out"): the groove simply carries on,
-  // steady, while the master fades it out over these 8 bars (tools/mix.py); nothing drops in and out, no last hit
-  [8,  stack(kick, clap, hats, bass(Aroots), plucks(4, 2.5), pad(A, 2600, 1800))],
+  [8,  stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],    // final drop: third time
+  [8,  stack(kick, clap, hats, bass(Aroots), plucks(4, 2.5), pad(A, 2600, 1800))],   // the ending: the groove carries on while the master fades it out
 )
+
 
 

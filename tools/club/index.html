@@ -50,11 +50,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 104;
+const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 84;
 // [first bar, name, energy 0..1, kick: 0 none / 1 four-on-the-floor / 2 half-time]
-const SECTIONS = [                                   // 104 bars, about 3:20; the announcer talks over the first 7.4 bars while the song starts
-  [0, 'announce', .4, 0], [8, 'introB', .4, 1], [16, 'build', .55, 1], [24, 'A', .7, 1], [32, 'break', .35, 0],
-  [40, 'drop', 1, 1], [56, 'B', .75, 1], [72, 'bridge', .45, 2], [80, 'final', 1, 1], [96, 'outroA', .35, 1]];
+const SECTIONS = [                                   // 84 bars, about 2:40; the announcer talks over the first 7.4 bars while the song starts
+  [0, 'announce', .4, 0], [8, 'introB', .4, 1], [12, 'build', .55, 1], [20, 'A', .7, 1], [28, 'break', .35, 0],
+  [36, 'drop', 1, 1], [52, 'B', .75, 1], [60, 'bridge', .45, 2], [68, 'final', 1, 1], [76, 'outroA', .35, 1]];
 const MC_END = 7.4;                                  // his one run-on line is 14.1 s long
 const sectionAt = (bar) => { let s = SECTIONS[0]; for (const x of SECTIONS) if (bar >= x[0]) s = x; return s; };
 const PINK = 0xff4fb0, CYAN = 0x3ef0ff, ORANGE = 0xe8622c;
@@ -667,7 +667,7 @@ new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/lime.vrm'
 // ---------- the "six, seven" emote (Joona, 2026-11-19): palms up, hands going up and down in turn ----------
 // On each bar where the voice says "six, seven": Ash does it, the two booth Claudios jump onto her hands and ride them,
 // and every other Claudio rocks side to side with it. Bars are 0-based and come from the set's vocal pattern.
-const SIXSEVEN = [24, 40, 80], EMOTE_BARS = 5;
+const SIXSEVEN = [20, 36, 68], EMOTE_BARS = 5;
 const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 function emoteAt(bar) {                               // e: how far into the pose (0..1); j: riders' jump (0 on the booth, 1 on her hands); alt: +1 her left hand up ("six"), -1 her right ("seven")
   for (const b of SIXSEVEN) { const t = bar - b;      // about 10 seconds (Joona: "she dances like that for like a few seconds, like maybe 10 seconds")
@@ -729,10 +729,21 @@ function restyleLime(vrm) {
   const pm = new THREE.PMREMGenerator(renderer), envMap = pm.fromEquirectangular(envTex).texture; pm.dispose();
   vrm.scene.traverse((o) => {
     if (o.name === 'Lime_ClaudioClip') o.visible = false;
+    if (o.isMesh && /^Lime_Visor/.test(o.name) && o.geometry.attributes.normal && !o.userData.pushed) {
+      // her bangs poked through the lens (Joona, 2026-11-19): push the lens and frame 7 mm out along their normals and let them win
+      // close depth ties, so hair just under the visor stays behind it
+      o.userData.pushed = true; o.geometry = o.geometry.clone();
+      const P = o.geometry.attributes.position, N = o.geometry.attributes.normal;
+      for (let i = 0; i < P.count; i++) P.setXYZ(i, P.getX(i) + N.getX(i) * .007, P.getY(i) + N.getY(i) * .007, P.getZ(i) + N.getZ(i) * .007);
+      P.needsUpdate = true; o.geometry.computeBoundingSphere();
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; });
+      o.renderOrder = 2;
+    }
     if (o.isMesh && o.material?.name === 'Lime_Visor_Prism') o.material = new THREE.MeshPhysicalMaterial({
       name: 'Lime_Visor_Prism', color: 0xffffff, map: visorTex, emissive: 0xffffff, emissiveMap: visorTex, emissiveIntensity: .32,
       metalness: .85, roughness: .07, envMap, envMapIntensity: 1.7, iridescence: 1, iridescenceIOR: 2.0, iridescenceThicknessRange: [180, 900],
-      clearcoat: 1, clearcoatRoughness: .03 });
+      clearcoat: 1, clearcoatRoughness: .03, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   });
 }
 let tongue = null;
@@ -750,11 +761,12 @@ function poseAsh(bar, sec, pulse, dt) {
   const emo = emoteAt(bar), pump = pumpAt(bar, sec);
   // Off the decks to dance (Joona, 2026-11-19: "we need ash to dance more in the beginning"): the second intro and the build
   // run on one dance clock, so the move does not restart at the build; the half-time bridge plays it at half speed.
-  const DANCE = { introB: [8, 1], build: [8, 1], B: [56, 1], bridge: [72, .5] }[sec[1]];
+  const DANCE = { introB: [8, 1], build: [8, 1], B: [52, 1], bridge: [60, .5] }[sec[1]];
   const dancing = !!DANCE && !emo.on && playMove('lime_dance', ash, (bar - DANCE[0]) * BAR_SEC * DANCE[1]);   // the six-seven wins over a dance (the first one starts in the build)
   ash.scene.position.z = dancing ? -.32 : .1;         // off the decks to dance, back to them after
   if (dancing) {
-    ash.expressionManager?.setValue('happy', .6);
+    ash.expressionManager?.setValue('happy', .6); ash.expressionManager?.setValue('aa', 0); ash.expressionManager?.setValue('blinkLeft', 0);
+    poseTongue(0); ash.scene.position.y = 0;                                               // nothing from the six-seven carries into a dance
     if (!settled) { ash.springBoneManager?.reset(); settled = true; }
     ash.update(dt); ash.scene.updateMatrixWorld(true); return;
   }
@@ -820,7 +832,7 @@ function poseRiders(bar) {
 // ---------- the Claudios circle Ash (Joona, 2026-11-19: "have the claudios also dance and circle her at some point") ----------
 // In the half-time bridge (bars 93-100, 1-based) all seven leave their spots in the first bar, orbit her at chest height a quarter
 // turn per bar while hopping and spinning on the beat, and fly back in the last bar before the final drop.
-const RING = { from: 72, to: 80, depth: .48, r: 1.1, y: 1.12, size: .4 };
+const RING = { from: 52, to: 68, depth: .48, r: 1.1, y: 1.12, size: .4 };
 function poseRing(bar) {
   const r = smooth(bar - RING.from) * (1 - smooth(bar - (RING.to - 1)));
   if (r <= 0) return;
@@ -856,7 +868,8 @@ function shotAt(bar, sec) {
   if (name === 'introA') return 0;
   if (name === 'introB') return bar - start < 4 ? 1 : 0;   // she has stepped back to dance: show her close first
   if (name === 'bridge') return bar - start < 4 ? 0 : 4;   // the Claudio ring: front, then from above
-  if (name === 'build' || name === 'B') return [0, 1, 4, 1][Math.floor((bar - start) / 4) % 4];   // she is dancing: front views only (from the side, her arms-out moves read as an arm bent backwards)
+  if (name === 'B') return [4, 1][Math.floor((bar - start) / 4) % 2];   // the Claudio ring: from above first, then close on her
+  if (name === 'build') return [0, 1, 4, 1][Math.floor((bar - start) / 4) % 4];   // she is dancing: front views only (from the side, her arms-out moves read as an arm bent backwards)
   const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
   const order = energy >= .9 ? [0, 1, 3, 8, 4, 1, 5, 2] : [1, 0, 2, 8, 0, 5, 4, 1];
   return order[(k + start) % order.length];
@@ -900,7 +913,7 @@ function frame(bar, dt) {
       c.vrm.update(dt);
     }
   });
-  renderer.toneMappingExposure = 1 - smooth((bar - 99) / 4.9);                             // the picture fades to black with the music
+  renderer.toneMappingExposure = 1 - smooth((bar - 79) / 4.9);                             // the picture fades to black with the music
   poseBall(bar, energy, pulse);
   if (visorTex) visorTex.offset.x = (bar * .25) % 1;                                        // the rainbow drifts across the lens
   poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseRiders(bar); poseRing(bar); poseMC(bar, sec, pulse, dt);
