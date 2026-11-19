@@ -94,7 +94,7 @@ const announce = stack(
 arrange(
   // about 3:20 (Joona: "I think the original was like 3 minutes, 19 seconds"): 104 bars at 126 BPM = 3:18 plus the last chord's tail
   [8,  stack(announce, plucks(.6, 2.5))],                                            // the song starts under the announcer
-  [8,  stack(plucks(2, 3.8), silence)],                                              // intro: plucks open up
+  [8,  stack(kick, plucks(2, 3.8), hats.mask("<0!4 1!4>"))],                          // intro: the kick comes in first, on its own (Joona: "add the kick at like the beginning"), hats after four bars
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],                 // build
   [8,  stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven)],                  // A: the line, first time
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],              // breakdown

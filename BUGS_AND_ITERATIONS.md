@@ -257,3 +257,12 @@ Joona, on v3: no hair clip and prismatic goggles; the announcer should be "one r
 Checked by screenshot: tongue placement close up, first emote riders, ring from above, crowd in the drop; no new console errors.
 
 RSI: ~40 min, 1 tongue-placement round -> no loss worth fixing (the md5-and-launch step worked first time).
+
+## ITER-025 (2026-11-19): video v5: mic at his mouth, movement audit, the kick comes in first
+- Joona: "The announcer is not holding the mic next to his mouth when he's talking." His Blender dance holds the mic at chest height. While he talks (bars 1 to 7.4) a two-joint IK brings his right hand to a point just below and in front of his mouth, turning each arm bone by the smallest rotation so the wrist and the mic angle carry over; it eases out when he stops. Checked close up at bars 2.5 and 5.5.
+- Joona: "arm going backwards as well" (a screenshot of Ash), then "one more audit through all the movements and the 3D aspect". Audit over all 6,017 frames, reading her arm bones back: 0 frames with a hand more than 20 cm behind her shoulder in room space, 0 in her chest's own frame; the only flagged pose is the headphone cue (hand at her ear). What he saw is the dance's arms-out-to-the-side move filmed from the side camera, where a sideways arm reads as bent backwards. Fix: while she dances (build, B) the camera uses front views only. The two largest hand jumps (0.7 m at bar 9, 0.9 m at bar 24.5) are pose switches that land on camera cuts.
+- Joona: "add the kick to the song a little bit earlier ... The build up all happens kind of all at once." The kick enters alone at bar 9, hats at 13, clap and bass at 17. Master re-made from stems: -14.2 LUFS, -1.5 dBTP, 3:20.6.
+- Render v5 on both Forge cards: 6,017 frames, 110 and 111 s; files md5-checked in the launch step. 12-frame sheet checked (mic at his mouth in the announcer shots, front views in the dance sections).
+Not audited by measurement: the 54 crowd dancers and the Claudios beyond the earlier screenshot checks.
+
+RSI: ~45 min, 3 audit scans -> top loss: two scans built on the wrong reading of the screenshot (about 6 min) -> fix: work out the camera's view of the pose before measuring.

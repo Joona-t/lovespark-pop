@@ -53,7 +53,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 104;
 // [first bar, name, energy 0..1, kick: 0 none / 1 four-on-the-floor / 2 half-time]
 const SECTIONS = [                                   // 104 bars, about 3:20; the announcer talks over the first 7.4 bars while the song starts
-  [0, 'announce', .4, 0], [8, 'introB', .3, 0], [16, 'build', .55, 1], [24, 'A', .7, 1], [32, 'break', .35, 0],
+  [0, 'announce', .4, 0], [8, 'introB', .4, 1], [16, 'build', .55, 1], [24, 'A', .7, 1], [32, 'break', .35, 0],
   [40, 'drop', 1, 1], [56, 'B', .75, 1], [72, 'bridge', .45, 2], [80, 'final', 1, 1], [96, 'outroA', .35, 1]];
 const MC_END = 7.4;                                  // his one run-on line is 14.1 s long
 const sectionAt = (bar) => { let s = SECTIONS[0]; for (const x of SECTIONS) if (bar >= x[0]) s = x; return s; };
@@ -599,6 +599,38 @@ function playMove(name, vrm, seconds) {               // pose the model from the
   const d = mv.clip.duration; mv.mixer.setTime(((seconds % d) + d) % d);
   return true;
 }
+// Joona, 2026-11-19: "The announcer is not holding the mic next to his mouth when he's talking." The dance holds the mic at
+// his chest, so while he talks a two-joint IK brings his right hand to his mouth: shoulder, elbow (pointing down and out) and
+// hand are solved in world space, and each bone is turned by the smallest rotation, which keeps the wrist (and the mic's angle).
+const MIC = { up: -.055, fwd: .1, side: .01 };     // where his hand goes, from the head bone: a little below and in front of the mouth
+const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _T = new THREE.Vector3(), _hd = new THREE.Vector3(), _fw = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _qw = new THREE.Quaternion(), _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
+function turnBoneTo(bone, from, to, w) {               // rotate `bone` so the world direction `from` (bone to child) becomes `to`
+  _q1.setFromUnitVectors(from.clone().normalize(), to.clone().normalize());
+  _q2.identity().slerp(_q1, w);
+  bone.parent.getWorldQuaternion(_qw);
+  bone.quaternion.premultiply(_qw.clone().invert().multiply(_q2).multiply(_qw));
+  bone.updateMatrixWorld(true);
+}
+function micToMouth(w) {
+  if (w <= 0) return;
+  const raw = (n) => mc.humanoid.getRawBoneNode(n), U = raw('rightUpperArm'), L = raw('rightLowerArm'), Hd = raw('rightHand'), head = raw('head');
+  if (!U || !L || !Hd || !head) return;
+  U.getWorldPosition(_S); L.getWorldPosition(_E); Hd.getWorldPosition(_H); head.getWorldPosition(_hd);
+  head.getWorldQuaternion(_qw); _fw.set(0, 0, 1).applyQuaternion(_qw);
+  const side = _v1.set(1, 0, 0).applyQuaternion(_qw);
+  _T.copy(_hd).addScaledVector(_fw, MIC.fwd).addScaledVector(side, MIC.side); _T.y += MIC.up;
+  const l1 = _S.distanceTo(_E), l2 = _E.distanceTo(_H), dir = _v2.subVectors(_T, _S), d = Math.min(dir.length(), (l1 + l2) * .995);
+  dir.normalize();
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const pole = new THREE.Vector3(0, -1, 0).addScaledVector(side, -.6);          // elbow down and out to his right
+  pole.addScaledVector(dir, -pole.dot(dir)).normalize();
+  const elbow = _S.clone().addScaledVector(dir, a).addScaledVector(pole, h);
+  turnBoneTo(U, _E.clone().sub(_S), elbow.clone().sub(_S), w);
+  L.getWorldPosition(_E); Hd.getWorldPosition(_H);
+  const target = _S.clone().addScaledVector(dir, d);
+  turnBoneTo(L, _H.clone().sub(_E), target.sub(_E), w);
+}
 function poseMC(bar, sec, pulse, dt) {
   if (!mc) return;
   const b = (n) => mc.humanoid.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
@@ -606,7 +638,9 @@ function poseMC(bar, sec, pulse, dt) {
   mc.scene.position.set(-1.3 - 1.75 * ease, 0, 1.7 - .55 * ease); mc.scene.rotation.y = .28 + .5 * ease;
   const talking = bar < MC_END;                                                                       // one run-on line, no pause
   const sway = Math.sin(beat * Math.PI / 2), hype = talking ? 1 : energy;
-  if (playMove('mc_dance', mc, bar * BAR_SEC)) {       // the Blender dance keeps the mic by his mouth; only his mouth is driven here
+  if (playMove('mc_dance', mc, bar * BAR_SEC)) {       // his Blender dance; while he talks, his mic hand is brought up to his mouth
+    mc.scene.updateMatrixWorld(true);
+    micToMouth(smooth((MC_END - bar) / .35) * smooth((bar + .2) / .2));
     mc.expressionManager?.setValue('aa', talking ? .35 + .35 * Math.abs(Math.sin(beat * Math.PI * 3.3)) : 0);
     if (!mcSettled) { mc.springBoneManager?.reset(); mcSettled = true; }
     mc.update(dt); return;
@@ -822,6 +856,7 @@ function shotAt(bar, sec) {
   if (name === 'introA') return 0;
   if (name === 'introB') return bar - start < 4 ? 1 : 0;   // she has stepped back to dance: show her close first
   if (name === 'bridge') return bar - start < 4 ? 0 : 4;   // the Claudio ring: front, then from above
+  if (name === 'build' || name === 'B') return [0, 1, 4, 1][Math.floor((bar - start) / 4) % 4];   // she is dancing: front views only (from the side, her arms-out moves read as an arm bent backwards)
   const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
   const order = energy >= .9 ? [0, 1, 3, 8, 4, 1, 5, 2] : [1, 0, 2, 8, 0, 5, 4, 1];
   return order[(k + start) % order.length];
@@ -906,7 +941,7 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }
-window.club = { still, POSE, moves, dancers, rigs, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
+window.club = { still, MIC, POSE, moves, dancers, rigs, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
   resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
 // ---------- video render (tools/club/render_video.py): fixed size, one frame per call at an exact bar position ----------
 window.club.offline = (w, h) => { offline = true; renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
