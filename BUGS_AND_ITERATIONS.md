@@ -82,3 +82,8 @@ Verified on the playing pattern: crowd and line 1 on bar 1, line 2 on bar 6, no 
 Root cause: the page swapped the pattern in 60 ms before the bar line; the scheduler had already queried that window with the old pattern, so onsets on the launch bar were never scheduled (the announcer's first line and the crowd never triggered; earlier launches lost their first kick unnoticed). Fix: swap 450 ms early with a stitched pattern, old events before the bar line and new ones from it. Check: after a launch, the sampler's load lines for bar-1 samples and the events on the launch bar.
 
 RSI: ~30 min, 1 re-launch -> top loss: BUG-008, found only because sample load lines were missing -> fix: stitched launch; bar-1 load lines are part of the launch check.
+
+## ITER-010 (2026-11-19): announcer line 2 rewritten, intro 12 bars
+Joona's new second line: "I don't know about you, but I'm ASI pilled, baby! Shout outs to Anthropic and Claude for making this all happen!" Six takes, all word-perfect by speech recognition (ASI written as spelled letters); the take with the held "baaaby" from the same seed as line 1 is used. Intro is now 12 bars (crowd re-enters at bar 7, roll 16/16/24/32 on bars 9-12), set on bar 13; 132 bars, about 4:11. Verified on the playing pattern after a stitched launch: new file loaded, no errors.
+
+RSI: ~8 min, 0 re-work -> no loss worth fixing (one generation, one check, one launch).
