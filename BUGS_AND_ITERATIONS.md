@@ -64,3 +64,12 @@ Lessons: (1) his dictation garbles words, so a surprising instruction ("robotic 
 Root cause: `${v}` interpolation inside a backtick string; Strudel treats backtick strings as mini-notation, so the eval failed and the old track kept playing. Caught by reading evalError after the push. Rule: build pattern strings with ordinary quotes and `+`.
 
 RSI: ~30 min, 2 wasted builds (robot voice, audition) -> top loss: acting on a garbled dictated instruction -> fix: confirm in one line when an instruction contradicts the direction so far.
+
+## ITER-008 (2026-11-19): one voice, one line
+Joona's direction after hearing 09: minimal lyrics, like English house. He auditioned four of our own voices with the new preview buttons on the live page, compared two back to back on the drop (`patterns/ab-soft-sultry.strudel.js`), and picked one. The whole lyric is now "six, seven ... can you feel it", once every 4 bars in A2, both drops and the outro, with "can you feel it" alone in the intro, B-section and bridge. Verified on the playing pattern: 43 vocal events over 120 bars in the planned bars, no other spoken phrases, no load errors. Voice samples stay local.
+Live page: a voice preview panel (one button per verified take, read from `samples/house/scan.json`).
+
+## BUG-007 (2026-11-19): audition voices silent, "Unable to decode audio data"
+Root cause: a generated `samples()` map used double quotes; Strudel turns every double-quoted string into a pattern, so each file path became "[object Object]". Found from the network log and `soundMap`. Fix: single quotes in sample maps. Check after any push that loads samples: the sampler's "done" lines and zero decode errors, not only scheduled events.
+
+RSI: ~50 min, 1 silent failure (~8 min) -> top loss: events were scheduled but no audio had loaded, and my check only counted events -> fix: sample pushes are verified by loaded-file lines and zero decode errors.

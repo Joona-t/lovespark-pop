@@ -1,4 +1,4 @@
-// 09 "Wake Signal (Awake Mix)" · 126 BPM, F minor, 120 bars (~3:49) · vocals: Rose (our own Qwen3-TTS voice)
+// 09 "Wake Signal (Awake Mix)" · 126 BPM, F minor, 120 bars (~3:49) · vocal: our own designed voice (Qwen3-TTS VoiceDesign)
 // Cooked live 2026-11-19. intro 16 · build 8 · A 16 · break 8 · drop 16 · B 16 · half-time bridge 8 · final drop 16 · outro 16
 // @q 4
 // @top
@@ -14,6 +14,9 @@ samples({
 // the sung line, hard-tuned to F minor by tools/sing.py
 samples(Object.fromEntries(['ivebeen', 'waiting', 'forthis', 'forsucha', 'long', 'time', 'forallof', 'my', 'life']
   .map(n => ['sing_' + n, ['sing_' + n + '.wav']])), 'http://localhost:4321/samples/sing/')
+// the vocal: one sultry designed voice, two phrases (single quotes: double-quoted strings become patterns)
+samples({ sultry_six: ['sultry__six__s1.wav', 'sultry__six__s2.wav'], sultry_seven: ['sultry__seven__s1.wav', 'sultry__seven__s2.wav'],
+  sultry_feelit: ['sultry__feelit__s1.wav', 'sultry__feelit__s2.wav'] }, 'http://localhost:4321/samples/house/')
 
 const A = "<Fm9 Db^7 Ab^7 Eb>", Aroots = "<f1 db1 ab0 eb1>"
 const B = "<Db^7 Eb Fm9 Cm7 Db^7 Eb Ab^7 C7>", Broots = "<db1 eb1 f1 c1 db1 eb1 ab0 c1>"
@@ -76,17 +79,20 @@ const sing = s(`<
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forsucha sing_long] sing_time
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forallof sing_my] sing_life>`)
   .hpf(300).room(.25).delay(.15).delaytime(3/8).delayfeedback(.3).gain(.5).orbit(6)
+// "six, seven ... can you feel it": the whole lyric (Joona, 2026-11-19), once every 4 bars
+const sixSeven = s("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] sultry_feelit ~ ~>")
+  .room(.3).delay(.25).delaytime(3/8).delayfeedback(.35).gain(.85).orbit(6)
 
 arrange(
-  [8,  stack(plucks(.5, 2), hats.gain(.3), far("<~ ~ ~ vox_hearme ~ ~ ~ ~>"))],
-  [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ vox_hearme:1 ~ ~ ~ ~>"))],
+  [8,  stack(plucks(.5, 2), hats.gain(.3), far("<~ ~ ~ sultry_feelit ~ ~ ~ ~>"))],
+  [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],
-  [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, far("<~!7 [~ ~ ~ vox_signal]>"), chops.mask("<0!8 1!8>"))],
+  [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven.mask("<0!8 1!8>"), chops.mask("<0!8 1!8>"))],
   [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],
-  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, chops, hey)],
-  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ vox_follow ~ ~ ~ vox_follow:1 ~>"))],
-  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser)],
-  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, chops, hey)],
-  [8,  stack(kick, hats, bass(Aroots), plucks(4, 2), far("<vox_signal ~ ~ ~ vox_signal:1 ~ ~ ~>"))],
-  [8,  stack(hats.gain(.3), plucks(2, .3), far("<~ ~ ~ ~ ~ ~ vox_awake:1 ~>"))],
+  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops, hey)],
+  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ ~ sultry_feelit ~ ~ ~ sultry_feelit:1>"))],
+  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ sultry_feelit ~ ~ ~ sultry_feelit:1 ~ ~>"))],
+  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops, hey)],
+  [8,  stack(kick, hats, bass(Aroots), plucks(4, 2), far("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~ [sultry_six ~ sultry_seven ~ ~ ~ ~ ~] ~ ~ ~>"))],
+  [8,  stack(hats.gain(.3), plucks(2, .3), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>"))],
 )

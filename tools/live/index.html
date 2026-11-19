@@ -24,6 +24,13 @@
   #dot.on { background:var(--pink); box-shadow:0 0 10px var(--pink); }
   #log { padding:6px 16px; color:var(--dim); font-size:12px; border-bottom:1px solid var(--line); max-height:4.5em; overflow:auto; }
   strudel-editor { display:block; }
+  #previews { position:relative; z-index:1; background:var(--panel); border-bottom:1px solid var(--line); padding:8px 16px; }
+  #previews summary { cursor:pointer; color:var(--pink); font-weight:700; letter-spacing:.06em; }
+  .pv-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0; }
+  .pv-name { width:72px; color:var(--cyan); font-weight:700; text-transform:uppercase; font-size:12px; }
+  .pv-row button { background:rgba(255,79,176,.12); color:var(--fg); border:1px solid var(--line); font-weight:400; padding:5px 9px; font-size:12px; }
+  .pv-row button.combo { background:var(--pink); color:#140a10; font-weight:700; }
+  .pv-row button.playing { outline:2px solid var(--cyan); }
 </style>
 </head>
 <body>
@@ -35,6 +42,10 @@
   <button id="stop" class="ghost">Stop</button>
 </header>
 <div id="log"></div>
+<details id="previews" open>
+  <summary>VOICE PREVIEWS · click to hear a take on its own</summary>
+  <div id="pv"></div>
+</details>
 <strudel-editor id="ed"><!--
 // waiting for the first push
 --></strudel-editor>
@@ -118,6 +129,30 @@
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+  })();
+  // Voice previews: one row per voice, a button per verified take, read from samples/house/scan.json.
+  (async () => {
+    const box = document.getElementById('pv');
+    const LABEL = { six: 'six', seven: 'seven', sixseven: 'six, seven', sixsixseven: 'six six seven', closer: 'closer', feelit: 'can you feel it',
+      dontstop: "don't stop", allnight: 'all night long', stay: 'stay with me', higher: 'take me higher', yeah: 'yeah', mmm: 'mmm' };
+    let scan; try { scan = await (await fetch('/samples/house/scan.json')).json(); } catch { box.textContent = 'no preview pack found'; return; }
+    const url = (f) => '/samples/house/' + f + '.wav';
+    const hit = (f, btn) => { const a = new Audio(url(f)); if (btn) { btn.classList.add('playing'); a.onended = () => btn.classList.remove('playing'); } a.play(); };
+    for (const voice of ['sultry', 'soft', 'whisper', 'belle']) {
+      const row = document.createElement('div'); row.className = 'pv-row';
+      const name = document.createElement('span'); name.className = 'pv-name'; name.textContent = voice; row.append(name);
+      const ok = (k, t) => scan[`${voice}__${k}__s${t}`]?.ok;
+      if (ok('six', 1) && ok('seven', 1)) {
+        const b = document.createElement('button'); b.className = 'combo'; b.textContent = '▶ six, six, seven';
+        b.onclick = () => { const beat = 60000 / 126; hit(`${voice}__six__s1`, b); setTimeout(() => hit(`${voice}__six__s1`), beat); setTimeout(() => hit(`${voice}__seven__s1`), beat * 2); };
+        row.append(b);
+      }
+      for (const k of Object.keys(LABEL)) for (const t of [1, 2]) {
+        if (!ok(k, t)) continue;
+        const b = document.createElement('button'); b.textContent = `${LABEL[k]} ${t}`; b.onclick = () => hit(`${voice}__${k}__s${t}`, b); row.append(b);
+      }
+      box.append(row);
+    }
   })();
 </script>
 </body>
