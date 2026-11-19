@@ -24,6 +24,18 @@ def main():
         def log_message(self, *a):
             pass
 
+        def do_POST(self):
+            # stills and audio takes made in the club page are saved to renders/ (local only, git-ignored)
+            import re
+            m = re.fullmatch(r"/save/([a-z0-9_-]{1,60}\.(?:png|webm|wav))", self.path)
+            n = int(self.headers.get("Content-Length", 0))
+            if not m or n <= 0 or n > 250_000_000:
+                self.send_error(400); return
+            out = ROOT / "renders"; out.mkdir(exist_ok=True)
+            (out / m.group(1)).write_bytes(self.rfile.read(n))
+            self.send_response(200); self.send_header("Content-Length", "2"); self.end_headers(); self.wfile.write(b"ok")
+            print(f"saved renders/{m.group(1)} ({n} bytes)", flush=True)
+
         def do_GET(self):
             if self.path == "/":
                 body = PAGE.read_bytes()
