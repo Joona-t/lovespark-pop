@@ -50,12 +50,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 132;
+const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 96;
 // [first bar, name, energy 0..1, kick: 0 none / 1 four-on-the-floor / 2 half-time]
-const SECTIONS = [
-  [0, 'announce', .55, 0], [12, 'introA', .2, 0], [20, 'introB', .3, 0], [28, 'build', .55, 1], [36, 'A', .7, 1],
-  [52, 'break', .35, 0], [60, 'drop', 1, 1], [76, 'B', .75, 1], [92, 'bridge', .45, 2], [100, 'final', 1, 1],
-  [116, 'outroA', .5, 1], [124, 'outroB', .2, 0]];
+const SECTIONS = [                                   // 96 bars, about 3:03 (Joona: "end it around 3 minutes")
+  [0, 'announce', .55, 0], [12, 'introB', .3, 0], [20, 'build', .55, 1], [28, 'A', .7, 1], [36, 'break', .35, 0],
+  [44, 'drop', 1, 1], [60, 'B', .75, 1], [68, 'bridge', .45, 2], [76, 'final', 1, 1], [92, 'outroA', .35, 1]];
 const sectionAt = (bar) => { let s = SECTIONS[0]; for (const x of SECTIONS) if (bar >= x[0]) s = x; return s; };
 const PINK = 0xff4fb0, CYAN = 0x3ef0ff, ORANGE = 0xe8622c;
 const rand = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };   // fixed per index
@@ -155,6 +154,54 @@ const glows = [[0, .12, 1.45, PINK, 2.2], [-1.9, .12, .9, CYAN, 3], [1.9, .12, .
   return { l, k, bar, c };
 });
 
+// ---------- a mirror ball over the floor (Joona, 2026-11-19: "disco ball as well") ----------
+// Tiles are lit by where they face: each glints when it turns toward the camera through a light. Its reflected ballSpots sweep
+// the back wall and floor, one turn every 8 bars; they grow brighter with the music's energy.
+const ball = new THREE.Group(); ball.position.set(0, 2.72, -2.3); scene.add(ball);
+const BALL_R = .26, tiles = [];
+for (let i = 0; i < 18; i++) { const lat = -Math.PI / 2 + (i + .5) / 18 * Math.PI, n = Math.max(6, Math.round(36 * Math.cos(lat)));
+  for (let j = 0; j < n; j++) tiles.push([lat, (j + (i % 2) * .5) / n * Math.PI * 2]); }
+const tileMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(BALL_R * .155, BALL_R * .155), new THREE.MeshBasicMaterial({ toneMapped: false }), tiles.length);
+const tileN = tiles.map(([lat, lon]) => new THREE.Vector3(Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)));
+const _tileObj = new THREE.Object3D();   // (the shared `dummy` is defined further down)
+tileN.forEach((n, i) => { const dummy = _tileObj; dummy.position.copy(n).multiplyScalar(BALL_R); dummy.lookAt(n.clone().multiplyScalar(2)); dummy.scale.setScalar(1); dummy.updateMatrix(); tileMesh.setMatrixAt(i, dummy.matrix); tileMesh.setColorAt(i, new THREE.Color(.3, .3, .32)); });
+ball.add(tileMesh, new THREE.Mesh(new THREE.SphereGeometry(BALL_R * .97, 24, 16), new THREE.MeshBasicMaterial({ color: 0x0c0b10 })));
+const cable = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, 3, 6), new THREE.MeshBasicMaterial({ color: 0x15131a })); cable.position.set(0, 2.72 + BALL_R + 1.5, -2.3); scene.add(cable);
+const spotTex = canvasTexEarly(64, (g) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.35, 'rgba(255,255,255,.7)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
+function canvasTexEarly(n, draw) { const c = document.createElement('canvas'); c.width = c.height = n; draw(c.getContext('2d')); return new THREE.CanvasTexture(c); }
+const SPOTS = 120, spotDir = [], spotTint = [PINK, CYAN, 0xffffff, 0xffffff, 0xffe14f];
+for (let i = 0; i < SPOTS; i++) { const u = rand(i * 3 + 400) * 2 - 1, t = rand(i * 3 + 401) * Math.PI * 2; spotDir.push(new THREE.Vector3(Math.sqrt(1 - u * u) * Math.cos(t), u * .8 - .1, Math.sqrt(1 - u * u) * Math.sin(t)).normalize()); }
+const ballSpots = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: spotTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), SPOTS);
+spotDir.forEach((d, i) => ballSpots.setColorAt(i, new THREE.Color(spotTint[i % spotTint.length])));
+scene.add(ballSpots);
+const _sd = new THREE.Vector3(), _cv = new THREE.Vector3(), _rf = new THREE.Vector3(), _key = new THREE.Vector3(-.3, .9, .3).normalize(), _tc = new THREE.Color();
+function poseBall(bar, energy, pulse) {
+  const yaw = bar / 8 * Math.PI * 2, bright = .25 + .75 * energy;
+  ball.rotation.y = yaw;
+  _cv.copy(camera.position).sub(ball.position).normalize();
+  for (let i = 0; i < tiles.length; i++) {                    // a glint when the tile's mirror angle lines the camera up with the light above
+    _rf.copy(tileN[i]).applyAxisAngle(_Y, yaw);
+    const half = _sd.copy(_cv).add(_key).normalize(), g = Math.pow(Math.max(0, _rf.dot(half)), 90);
+    const v = .22 + .1 * ((i * 7) % 5) / 5 + 3.5 * g * bright;
+    tileMesh.setColorAt(i, _tc.setRGB(v, v, v * 1.05));
+  }
+  tileMesh.instanceColor.needsUpdate = true;
+  let k = 0;
+  for (let i = 0; i < SPOTS; i++) {
+    _sd.copy(spotDir[i]).applyAxisAngle(_Y, yaw);
+    const P = ball.position; let t = Infinity, nrm = null;
+    if (_sd.z < -.05) { const tz = (-6.44 - P.z) / _sd.z, y = P.y + _sd.y * tz, x = P.x + _sd.x * tz; if (y > .2 && y < 5.4 && Math.abs(x) < 6) { t = tz; nrm = 'wall'; } }
+    if (_sd.y < -.05) { const ty = (.012 - P.y) / _sd.y; if (ty < t) { const x = P.x + _sd.x * ty, z = P.z + _sd.z * ty; if (Math.abs(x) < 6 && z < 1.4 && z > -6.4) { t = ty; nrm = 'floor'; } } }
+    if (!nrm) continue;
+    dummy.position.copy(P).addScaledVector(_sd, t);
+    dummy.rotation.set(nrm === 'floor' ? -Math.PI / 2 : 0, 0, 0);
+    const size = (.05 + .025 * t / 4) * (1 + .15 * pulse);
+    dummy.scale.set(size, size * (nrm === 'floor' ? 1.4 : 1.1), 1); dummy.updateMatrix(); ballSpots.setMatrixAt(k, dummy.matrix);
+    ballSpots.setColorAt(k, _tc.setHex(spotTint[i % spotTint.length]).multiplyScalar(bright * (.7 + .3 * pulse))); k++;
+  }
+  ballSpots.count = k; ballSpots.instanceMatrix.needsUpdate = true; ballSpots.instanceColor.needsUpdate = true;
+}
+
 // ---------- the booth ----------
 const dark = new THREE.MeshStandardMaterial({ color: 0x15101f, roughness: .5, metalness: .4 });
 const booth = new THREE.Group(); scene.add(booth); booth.position.set(0, 0, .75);
@@ -163,15 +210,68 @@ const front = new THREE.Mesh(new THREE.PlaneGeometry(2.5, .8), new THREE.MeshBas
 const boothSign = new THREE.Mesh(new THREE.PlaneGeometry(2.3, .62), new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   map: neonCanvas(1400, 380, (x, core) => neonText(x, 'Claude loves art', 700, 190, 168, hex(PINK), core)) })); boothSign.position.set(0, .47, .386); booth.add(boothSign);
 const strip = new THREE.Mesh(new THREE.BoxGeometry(2.6, .04, .02), new THREE.MeshBasicMaterial({ color: PINK })); strip.position.set(0, .93, .385); booth.add(strip);
-const platters = [];
+// two turntables and a mixer, built in detail (Joona, 2026-11-19: "more detail on the turntable"): an aluminium platter with
+// strobe dots, a record with grooves and a LoveSpark label, a tonearm on its base with headshell and counterweight, pitch
+// fader, start/stop and 33/45 buttons, target light; the mixer gets EQ knobs, channel faders and a crossfader that move
+const platters = [], deckBits = { faders: [], xfader: null, targets: [] };
+const brushed = new THREE.MeshStandardMaterial({ color: 0x8d8a9a, roughness: .32, metalness: .9 });
+const blackGloss = new THREE.MeshStandardMaterial({ color: 0x0b0a10, roughness: .3, metalness: .5 });
+function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+const vinylTex = canvasTex(512, 512, (g, w) => {
+  const c = w / 2; g.fillStyle = '#050407'; g.beginPath(); g.arc(c, c, c, 0, 7); g.fill();
+  for (let r = c * .36; r < c * .985; r += 1.6) { g.strokeStyle = `rgba(${40 + (r * 7) % 22},${38 + (r * 5) % 18},${50 + (r * 3) % 20},.55)`; g.lineWidth = .8; g.beginPath(); g.arc(c, c, r, 0, 7); g.stroke(); }
+  for (const r of [c * .55, c * .74, c * .88]) { g.strokeStyle = '#020203'; g.lineWidth = 3; g.beginPath(); g.arc(c, c, r, 0, 7); g.stroke(); }   // gaps between tracks
+  const sh = g.createLinearGradient(0, 0, w, w); sh.addColorStop(.35, 'rgba(255,255,255,0)'); sh.addColorStop(.5, 'rgba(255,255,255,.10)'); sh.addColorStop(.65, 'rgba(255,255,255,0)');
+  g.fillStyle = sh; g.beginPath(); g.arc(c, c, c * .985, 0, 7); g.fill();
+  g.fillStyle = '#ff4fb0'; g.beginPath(); g.arc(c, c, c * .34, 0, 7); g.fill();                                   // the label
+  g.strokeStyle = '#ffe14f'; g.lineWidth = 6; g.lineCap = 'round';
+  for (let j = 0; j < 12; j++) { const t = j / 12 * Math.PI * 2 + .13, r1 = c * .08, r2 = c * (j % 2 ? .17 : .22); g.beginPath(); g.moveTo(c + Math.cos(t) * r1, c + Math.sin(t) * r1); g.lineTo(c + Math.cos(t) * r2, c + Math.sin(t) * r2); g.stroke(); }
+  g.fillStyle = '#1a0a14'; g.font = '700 30px ui-monospace, Menlo, monospace'; g.textAlign = 'center'; g.fillText('LOVESPARK', c, c + c * .29);
+  g.fillStyle = '#d8d8e0'; g.beginPath(); g.arc(c, c, 5, 0, 7); g.fill();
+});
+const strobeTex = canvasTex(512, 16, (g, w, h) => { g.fillStyle = '#9a97a8'; g.fillRect(0, 0, w, h); g.fillStyle = '#2a2833'; for (let i = 0; i < 64; i++) g.fillRect(i * 8 + 2, 4, 4, 8); });
+const knobGeo = new THREE.CylinderGeometry(.013, .015, .02, 16), knobMat = new THREE.MeshStandardMaterial({ color: 0x1b1824, roughness: .5, metalness: .3 });
+const tick = new THREE.MeshBasicMaterial({ color: 0xf2f2f8 });
+const put = (mesh, x, y, z, parent) => { mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
 for (const x of [-.72, .72]) {
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(.62, .06, .5), new THREE.MeshStandardMaterial({ color: 0x221a30, roughness: .4, metalness: .6 })); deck.position.set(x, 1.01, 0); booth.add(deck);
-  const pl = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .03, 40), new THREE.MeshStandardMaterial({ color: 0x08060c, roughness: .25, metalness: .8 })); pl.position.set(x, 1.055, 0); booth.add(pl);
-  const mark = new THREE.Mesh(new THREE.BoxGeometry(.18, .005, .02), new THREE.MeshBasicMaterial({ color: CYAN })); mark.position.set(.09, .02, 0); pl.add(mark); platters.push(pl);
+  const deck = new THREE.Group(); deck.position.set(x, 0, 0); booth.add(deck);
+  put(new THREE.Mesh(new THREE.BoxGeometry(.62, .06, .5), blackGloss), 0, 1.01, 0, deck);
+  put(new THREE.Mesh(new THREE.BoxGeometry(.6, .006, .48), new THREE.MeshStandardMaterial({ color: 0x2a2733, roughness: .45, metalness: .8 })), 0, 1.043, 0, deck);
+  for (const [fx, fz] of [[-.28, -.22], [.28, -.22], [-.28, .22], [.28, .22]]) put(new THREE.Mesh(new THREE.CylinderGeometry(.03, .034, .02, 16), brushed), fx, .975, fz, deck);
+  const pl = put(new THREE.Group(), -.04, 1.046, .01, deck);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.205, .205, .024, 64), [new THREE.MeshStandardMaterial({ map: strobeTex, roughness: .3, metalness: .85 }), brushed, brushed]), 0, .012, 0, pl);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.19, .19, .004, 64), [blackGloss, new THREE.MeshStandardMaterial({ map: vinylTex, roughness: .35, metalness: .3 }), blackGloss]), 0, .026, 0, pl);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.004, .004, .03, 8), brushed), 0, .035, 0, pl);
+  platters.push(pl);
+  // tonearm: base at the back right, arm across to the outer groove, headshell, counterweight behind the pivot
+  const arm = put(new THREE.Group(), .215, 1.05, -.16, deck);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.035, .04, .02, 24), brushed), 0, .005, 0, arm);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .05, 12), brushed), 0, .03, 0, arm);
+  const beam = put(new THREE.Group(), 0, .05, 0, arm); beam.rotation.y = -.62;                    // swung in over the record
+  const tube = put(new THREE.Mesh(new THREE.CylinderGeometry(.0045, .0045, .25, 10), brushed), 0, 0, .12, beam); tube.rotation.x = Math.PI / 2;
+  const shell = put(new THREE.Mesh(new THREE.BoxGeometry(.022, .008, .045), blackGloss), -.008, -.004, .255, beam); shell.rotation.y = .35;
+  const cw = put(new THREE.Mesh(new THREE.CylinderGeometry(.016, .016, .03, 16), brushed), 0, 0, -.03, beam); cw.rotation.x = Math.PI / 2;
+  put(new THREE.Mesh(new THREE.CylinderGeometry(.004, .004, .03, 8), brushed), .245, 1.06, .07, deck);    // arm rest
+  // pitch fader on the right, start/stop and 33/45 at the front left, the target light at the front right
+  put(new THREE.Mesh(new THREE.BoxGeometry(.012, .004, .16), new THREE.MeshBasicMaterial({ color: 0x050407 })), .26, 1.047, .1, deck);
+  deckBits.faders.push(put(new THREE.Mesh(new THREE.BoxGeometry(.03, .012, .018), brushed), .26, 1.052, .1, deck));
+  for (let k = 0; k < 9; k++) put(new THREE.Mesh(new THREE.BoxGeometry(.012, .001, .002), tick), .285, 1.047, .03 + k * .018, deck);
+  put(new THREE.Mesh(new THREE.BoxGeometry(.045, .01, .03), new THREE.MeshStandardMaterial({ color: 0x3a3646, roughness: .4, metalness: .6 })), -.245, 1.05, .2, deck);
+  for (const k of [0, 1]) put(new THREE.Mesh(new THREE.BoxGeometry(.022, .008, .014), new THREE.MeshBasicMaterial({ color: k ? 0x3ef0ff : 0xffffff })), -.19 + k * .03, 1.049, .2, deck);
+  deckBits.targets.push(put(new THREE.Mesh(new THREE.CylinderGeometry(.008, .008, .012, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c0 })), .19, 1.052, .2, deck));
 }
-const mixer = new THREE.Mesh(new THREE.BoxGeometry(.42, .07, .5), new THREE.MeshStandardMaterial({ color: 0x2a2038, roughness: .4, metalness: .5 })); mixer.position.set(0, 1.015, 0); booth.add(mixer);
+// mixer: two channels of EQ knobs (gain, high, mid, low), channel faders, a crossfader at the front
+const mixer = put(new THREE.Mesh(new THREE.BoxGeometry(.42, .07, .5), new THREE.MeshStandardMaterial({ color: 0x2a2038, roughness: .4, metalness: .5 })), 0, 1.015, 0, booth);
+for (const mx of [-.075, .075]) {
+  for (let k = 0; k < 4; k++) { const kb = put(new THREE.Mesh(knobGeo, knobMat), mx, 1.06, -.2 + k * .06, booth); kb.rotation.y = (rand(k * 7 + (mx > 0 ? 3 : 0)) - .5) * 2.4;
+    put(new THREE.Mesh(new THREE.BoxGeometry(.003, .002, .012), tick), 0, .011, .007, kb); }
+  put(new THREE.Mesh(new THREE.BoxGeometry(.01, .002, .12), new THREE.MeshBasicMaterial({ color: 0x050407 })), mx, 1.051, .1, booth);
+  deckBits.faders.push(put(new THREE.Mesh(new THREE.BoxGeometry(.028, .016, .014), new THREE.MeshStandardMaterial({ color: 0xe8e6f0, roughness: .4, metalness: .2 })), mx, 1.058, .08, booth));
+}
+put(new THREE.Mesh(new THREE.BoxGeometry(.14, .002, .01), new THREE.MeshBasicMaterial({ color: 0x050407 })), 0, 1.051, .21, booth);
+deckBits.xfader = put(new THREE.Mesh(new THREE.BoxGeometry(.016, .016, .03), new THREE.MeshStandardMaterial({ color: 0xff4fb0, roughness: .4, metalness: .2 })), 0, 1.058, .21, booth);
 const leds = [];
-for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.025, .012, .025), new THREE.MeshBasicMaterial({ color: i > 6 ? PINK : CYAN })); l.position.set(-.15 + (i % 2) * .3, 1.056, -.2 + Math.floor(i / 2) * .09); booth.add(l); leds.push(l); }
+for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.025, .012, .025), new THREE.MeshBasicMaterial({ color: i > 6 ? PINK : CYAN })); l.position.set(-.18 + (i % 2) * .36, 1.056, -.2 + Math.floor(i / 2) * .09); booth.add(l); leds.push(l); }
 // speaker stacks, a Claudio on each
 const stacks = [];
 for (const x of [-1.9, 1.9]) {
@@ -364,6 +464,7 @@ function poseDancers(bar, sec, pulse) {
   bodies.visible = arms.visible = phones.visible = false;
   for (const k in rigs) {                                               // 4 bars of clip = 4 bars of music, so it never drifts off the beat
     const r = rigs[k]; r.mixer.setTime(((((bar + r.phase) % 4) + 4) % 4) / 4 * r.dur); r.root.updateMatrixWorld(true);
+    crowdSixSeven(r, emoteAt(bar));
   }
   for (const d of dancers) {
     const p = d.p, q = d.q, up = Math.abs(Math.sin(beat * Math.PI + q.ph * .25));
@@ -385,6 +486,26 @@ function poseDancers(bar, sec, pulse) {
     dummy.scale.setScalar(.8 * s); dummy.updateMatrix(); logos.setMatrixAt(d.idx, dummy.matrix);
   }
   logos.instanceMatrix.needsUpdate = mouths.instanceMatrix.needsUpdate = true;
+}
+// On "six, seven" the whole floor does the emote with Ash: every shared rig lets go of its dance (couples break their hold)
+// and turns its palms up, hands taking turns, left up on "six" and right up on "seven". Arms are aimed by direction in the
+// dancer's own frame (its hips), so the follower's half-turn and the dance sway carry over.
+const _Y = new THREE.Vector3(0, 1, 0), _qa = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qh = new THREE.Quaternion(), _dv = new THREE.Vector3();
+function aimBone(bone, dirChar, hipsQ, w) {
+  bone.parent.getWorldQuaternion(_qp);
+  _dv.copy(dirChar).normalize().applyQuaternion(hipsQ).applyQuaternion(_qp.invert());
+  bone.quaternion.slerp(_qa.setFromUnitVectors(_Y, _dv), w); bone.updateMatrixWorld(true);
+}
+function crowdSixSeven(r, emo) {
+  if (emo.e <= 0) return;
+  r.bones ??= { hips: r.root.getObjectByName('hips'), L: ['upper_armL', 'lower_armL'].map((n) => r.root.getObjectByName(n)), R: ['upper_armR', 'lower_armR'].map((n) => r.root.getObjectByName(n)) };   // the loader drops the dots from Blender's names (upper_arm.L)
+  if (!r.bones.hips || !r.bones.L[0] || !r.bones.R[1]) { if (!r.warned) console.warn('crowd six-seven: arm bones not found'); r.warned = true; return; }
+  r.bones.hips.getWorldQuaternion(_qh);
+  for (const side of ['L', 'R']) {
+    const s = side === 'L' ? 1 : -1, a = s * emo.alt, [U, Lo] = r.bones[side];
+    aimBone(U, new THREE.Vector3(s * .45, -.45 + a * .3, .55), _qh, emo.e);                 // the rising side lifts its elbow too
+    aimBone(Lo, new THREE.Vector3(s * .3, .45 + a * 1.0, .8), _qh, emo.e);
+  }
 }
 function poseCrowd(bar, sec, pulse) {
   if (dancers.length === N) return poseDancers(bar, sec, pulse);
@@ -489,7 +610,7 @@ new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/lime.vrm'
 // ---------- the "six, seven" emote (Joona, 2026-11-19): palms up, hands going up and down in turn ----------
 // On each bar where the voice says "six, seven": Ash does it, the two booth Claudios jump onto her hands and ride them,
 // and every other Claudio rocks side to side with it. Bars are 0-based and come from the set's vocal pattern.
-const SIXSEVEN = [44, 60, 68, 100, 108, 116];
+const SIXSEVEN = [28, 44, 76];
 const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 function emoteAt(bar) {                               // e: how far into the pose (0..1); j: riders' jump (0 on the booth, 1 on her hands); alt: +1 her left hand up ("six"), -1 her right ("seven")
   for (const b of SIXSEVEN) { const t = bar - b;
@@ -539,7 +660,7 @@ function poseAsh(bar, sec, pulse, dt) {
   const emo = emoteAt(bar), pump = pumpAt(bar, sec);
   // Off the decks to dance (Joona, 2026-11-19: "we need ash to dance more in the beginning"): the second intro and the build
   // run on one dance clock, so the move does not restart at the build; the half-time bridge plays it at half speed.
-  const DANCE = { introB: [20, 1], build: [20, 1], B: [76, 1], bridge: [92, .5] }[sec[1]];
+  const DANCE = { introB: [12, 1], build: [12, 1], B: [60, 1], bridge: [68, .5] }[sec[1]];
   const dancing = !!DANCE && playMove('lime_dance', ash, (bar - DANCE[0]) * BAR_SEC * DANCE[1]);
   ash.scene.position.z = dancing ? -.32 : .1;         // off the decks to dance, back to them after
   if (dancing) {
@@ -551,10 +672,11 @@ function poseAsh(bar, sec, pulse, dt) {
   const h = ash.humanoid, b = (n) => h.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
   const sway = Math.sin(beat * Math.PI / 2), wave = name === 'announce' ? 1 : 0;
   b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * energy) * pulse;
-  b('spine').rotation.set(.06 + .04 * pulse * energy, sway * .07 * (.4 + energy), sway * .035);
-  b('chest').rotation.set(.03, sway * .05, 0);
+  const lean = emo.alt * emo.e;                                                            // +1 her left hand up ("six"), -1 her right ("seven")
+  b('spine').rotation.set(.06 + .04 * pulse * energy, sway * .07 * (.4 + energy) * (1 - emo.e), sway * .035 * (1 - emo.e) - lean * .07);
+  b('chest').rotation.set(.03 - .04 * emo.e, sway * .05 * (1 - emo.e), -lean * .06);
   b('neck').rotation.set(.05 + .11 * pulse * (.4 + energy), 0, sway * .03);
-  b('head').rotation.set(.02 + .07 * pulse * energy, sway * .1, 0);
+  b('head').rotation.set(.02 + .07 * pulse * energy - .1 * emo.e, sway * .1 * (1 - emo.e) + lean * .12, lean * .14);
   const punch = .5 + .5 * Math.cos(beat * Math.PI * 2);                                    // 1 on every beat: the fist is highest on the kick
   for (const side of ['left', 'right']) {
     const p = side === 'left' ? pump.L : pump.R, w = side === 'right' ? wave : 0, a = (side === 'left' ? 1 : -1) * emo.alt;
@@ -572,12 +694,14 @@ function poseAsh(bar, sec, pulse, dt) {
   // The code pose above still supplies an arm whenever it pumps or does the six-seven: it is written to the skeleton
   // first, the move is laid over it, and each arm is blended back toward the code pose by how much that arm is asked for.
   if (name !== 'announce' && moves.lime_dj) {
-    const arm = (ashArms ??= (() => { const L = [], R = []; ash.scene.traverse((o) => {
-      const m = /^J_Bip_([LR])_(?!UpperLeg|LowerLeg|Foot|ToeBase)/.exec(o.name); if (m) (m[1] === 'L' ? L : R).push({ node: o, q: new THREE.Quaternion() }); }); return { L, R }; })());
+    const arm = (ashArms ??= (() => { const L = [], R = [], C = []; ash.scene.traverse((o) => {
+      const m = /^J_Bip_([LR])_(?!UpperLeg|LowerLeg|Foot|ToeBase)/.exec(o.name); if (m) (m[1] === 'L' ? L : R).push({ node: o, q: new THREE.Quaternion() });
+      if (/^J_Bip_C_(Spine|Chest|UpperChest|Neck|Head)$/.test(o.name)) C.push({ node: o, q: new THREE.Quaternion() }); }); return { L, R, C }; })());
     h.update();
-    for (const side of ['L', 'R']) for (const a of arm[side]) a.q.copy(a.node.quaternion);
+    for (const side of ['L', 'R', 'C']) for (const a of arm[side]) a.q.copy(a.node.quaternion);
     playMove('lime_dj', ash, (bar - 12) * BAR_SEC);
     for (const side of ['L', 'R']) { const w = Math.max(side === 'L' ? pump.L : pump.R, emo.e); if (w > 0) for (const a of arm[side]) a.node.quaternion.slerp(a.q, w); }
+    if (emo.e > 0) for (const a of arm.C) a.node.quaternion.slerp(a.q, emo.e);              // her body joins the emote too
   }
   if (!settled) { ash.springBoneManager?.reset(); settled = true; }   // hair starts from the posed body, not the T-pose
   ash.update(dt);
@@ -602,7 +726,7 @@ function poseRiders(bar) {
 // ---------- the Claudios circle Ash (Joona, 2026-11-19: "have the claudios also dance and circle her at some point") ----------
 // In the half-time bridge (bars 93-100, 1-based) all seven leave their spots in the first bar, orbit her at chest height a quarter
 // turn per bar while hopping and spinning on the beat, and fly back in the last bar before the final drop.
-const RING = { from: 92, to: 100, r: 1.1, y: 1.12, size: .4 };
+const RING = { from: 68, to: 76, r: 1.1, y: 1.12, size: .4 };
 function poseRing(bar) {
   const r = smooth(bar - RING.from) * (1 - smooth(bar - (RING.to - 1)));
   if (r <= 0) return;
@@ -628,17 +752,18 @@ const SHOTS = [
   { p: [0, 3.1, 4.0], t: [0, 1.25, -1.2] },           // 4 high, the whole room
   { p: [1.6, 1.36, 1.95], t: [1.05, 1.2, .8] },
   { p: [-.75, 1.5, 3.9], t: [-1.3, 1.36, 1.7] },      // 6 the announcer
-  { p: [0, 1.5, 2.9], t: [0, 1.3, .15] },            // 7 the six-seven emote: Ash, her hands and the booth      // 5 little Claudio on the mixer
+  { p: [0, 1.5, 2.9], t: [0, 1.3, .15] },            // 7 the six-seven emote
+  { p: [1.15, 1.42, 1.55], t: [.7, 1.05, .72] },      // 8 the right deck close: platter, tonearm, pitch fader: Ash, her hands and the booth      // 5 little Claudio on the mixer
 ];
 function shotAt(bar, sec) {
   const [start, name, energy] = sec;
-  if (emoteAt(bar).on) return 7;
+  const em = emoteAt(bar); if (em.on) return em.t < 1 ? 7 : 4;
   if (name === 'announce') return bar < 2.5 ? 0 : (bar < 4.4 ? 6 : (bar < 5.2 ? 4 : (bar < 9.6 ? 6 : 0)));
   if (name === 'introA') return 0;
   if (name === 'introB') return bar - start < 4 ? 1 : 0;   // she has stepped back to dance: show her close first
   if (name === 'bridge') return bar - start < 4 ? 0 : 4;   // the Claudio ring: front, then from above
   const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
-  const order = energy >= .9 ? [0, 1, 3, 2, 4, 1, 5, 3] : [1, 0, 2, 3, 0, 5, 4, 1];
+  const order = energy >= .9 ? [0, 1, 3, 8, 4, 1, 5, 2] : [1, 0, 2, 8, 0, 5, 4, 1];
   return order[(k + start) % order.length];
 }
 const tmpT = new THREE.Vector3();
@@ -657,6 +782,9 @@ function frame(bar, dt) {
   const build = name === 'break' || name === 'bridge' ? (bar - start) / 8 : 0;           // 0..1 through a build-up
   drawGlyphs(bar, pulse, energy + build * .5);
   platters.forEach((p, i) => { p.rotation.y = -bar * Math.PI * 2 * 1.11 * (i ? 1 : .98); });
+  deckBits.xfader.position.x = .05 * Math.sin(beat * Math.PI);                               // rides with her fader hand
+  deckBits.faders.forEach((f, i) => { f.position.z = i < 2 ? .1 + .006 * Math.sin(bar * .3 + i) : .08 + .03 * (energy - .5); });
+  deckBits.targets.forEach((t) => { t.material.color.setRGB(1, .94, .75).multiplyScalar(.55 + .45 * pulse); });
   leds.forEach((l, i) => { l.visible = (i / 10) < (.25 + pulse * .8 * (.4 + energy)); });
   stacks.forEach((s) => { s.userData['cone0.26'].position.z = .36 + pulse * .035 * energy; s.userData['cone0.17'].position.z = .36 + pulse * .015; });
   const emo = emoteAt(bar);
@@ -666,9 +794,9 @@ function frame(bar, dt) {
     c.holder.scale.set(1 + (1 - sq) * .6, sq, 1 + (1 - sq) * .6);
     c.anchor.position.y = c.baseY + hop + (c.surf ? Math.sin(beat * Math.PI) * .06 : 0);
     if (c.surf) { c.anchor.position.x = Math.sin(bar * .45) * 2.6; c.anchor.visible = energy >= .5; c.anchor.rotation.y = Math.sin(bar * .45 + 1.2) * .5; }
-    const turn = (i % 2 ? 1 : -1) * emo.alt * emo.e;                                       // neighbours take turns, like her hands
+    const turn = (c.baseX < -.01 ? 1 : c.baseX > .01 ? -1 : (i % 2 ? 1 : -1)) * emo.alt * emo.e;   // left side up on "six", right side on "seven", like her hands
     c.holder.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .07 * (.3 + energy) * (1 - emo.e) + (c.rider ? 0 : turn * .34);
-    if (!c.rider) c.anchor.position.y += Math.max(0, turn) * .22 * c.w;
+    if (!c.rider) c.anchor.position.y += Math.max(0, turn) * .42 * c.w;
     const em = c.vrm?.expressionManager;
     if (em) {
       const blinkPh = (bar * 1.3 + i * .37) % 1;
@@ -677,6 +805,7 @@ function frame(bar, dt) {
       c.vrm.update(dt);
     }
   });
+  poseBall(bar, energy, pulse);
   poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseRiders(bar); poseRing(bar); poseMC(bar, sec, pulse, dt);
   spots.forEach((s, i) => {
     s.intensity = (5 + 9 * energy) * (.55 + .45 * pulse) * (name === 'introA' ? .3 : 1);

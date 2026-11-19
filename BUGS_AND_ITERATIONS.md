@@ -225,3 +225,22 @@ Video v2: 0 frames over 0.5% white (v1: 19), highest 0.19%.
 Joona: "we need ash to dance more in the ebeginning have the claudios also dance and circle her at some point". Ash steps off the decks to dance through the second intro and the build (bars 21-36, one dance clock so the move does not restart at the build), and in the half-time bridge at half speed, as well as in B. The second intro opens on the close shot. In the bridge (bars 93-100) all seven Claudios fly in over one bar, orbit her at chest height a quarter turn per bar, hopping on every beat and spinning every half bar, and fly home in the last bar before the final drop; the camera is in front for four bars, then high. Previewed at 12 frames before the render; video v2 rendered on both Forge GPUs (125 s and 126 s).
 
 RSI: ~1 h -> top loss: chasing a driver bug for 4 runs because the first light test reused page state between runs -> fix: diagnostics on the stage use a fresh page per variant, written up above.
+
+## ITER-023 (2026-11-19): video v3: 3 minutes, line once per 16 bars, detailed decks, disco ball, the whole club does the six-seven
+Joona, after v2: "more detail on the turntable and better choreographed dance 6 7 and can you feel it even less appears too often", "disco ball as well", "lets end it around 3 minutes".
+- **3 minutes:** 96 bars (3:03): announcer 12, intro 8, build 8, A 8, breakdown 8, drop 16, B 8, bridge 8, final drop 16, outro 4. The scene's SECTIONS, SIXSEVEN, DANCE, RING, `BARS` in the page, `render_video.mjs` and `mix.py` (FIRST_KICK_BAR 20) all moved with it.
+- **Vocal:** "six, seven ... can you feel it" once per 16 bars, three times (bars 29, 45, 77), was six; the distant "can you feel it" once (the bridge gap), was five. Read off the playing pattern.
+- **Mix:** re-captured from stems (186 s) and mastered: -14.0 LUFS, -1.4 dBTP, null test -32.8 dB.
+- **Turntables:** strobe-dotted aluminium platter, a record with grooves, track gaps and a LoveSpark label, tonearm with base, headshell and counterweight, arm rest, pitch fader with ticks, start/stop, 33/45, target light; the mixer has EQ knobs, channel faders and a crossfader that rides with her fader hand. A deck close-up joins the camera rotation.
+- **Disco ball:** 418 mirror tiles that glint when they turn toward the camera, light spots that sweep the back wall and floor (one turn per 8 bars, brighter with the energy).
+- **Six-seven:** the whole floor does it with her: each shared crowd rig drops its dance and aims its arms by direction (palms up, hands taking turns, swing 46 cm); her torso leans away from the rising hand and her head tilts to it; the Claudios jump left side on "six", right side on "seven"; the camera holds her for the first bar and cuts high and wide for the second.
+- Render on the Forge, both cards (3090 Ti and 3090): 5,560 frames in 94 and 96 s, `renders/cyber-space-set-v3.mp4`, 3:05, -14.1 LUFS.
+Checked: 16-frame contact sheet across the video (ball, decks, emote at 29 and 45 with the riders on her hands), crowd hand heights read back (left 0.61 / right 0.16 m above the hips on "six", reversed on "seven").
+
+## BUG-011 (2026-11-19): the crowd's six-seven did nothing
+Root cause: GLTFLoader removes dots from node names, so `upper_arm.L` is `upper_armL`; the lookup found nothing and the function returned silently. Caught by reading bone positions back, not by the screenshot (arms move in the dance anyway). Fix: real names, and a console warning if any arm bone is missing.
+
+## BUG-012 (2026-11-19): the first v3 render used the old scene
+Root cause: a file sync stalled; I killed it and copied the files by hand, but the stalled command carried on and launched the render 6 s before the new stage file landed (Forge mtime 13:52:34, render start 13:52:28). That render had v2's 132-bar scene over the new 96-bar music, no ball and no new decks. Caught on the contact sheet (no ball anywhere). A second launch I made collided with it and failed harmlessly. Fix: the render was redone after checking the Forge files' md5 against the repo. Prevention: start a render only in the same command that verified the md5s; never leave a backgrounded copy-and-launch running while copying by hand. Also: the stalled `rsync --delete-excluded` may have removed the other session's `diag*.mjs` scripts from the Forge stage folder (they are gone; it is not certain which removed them).
+
+RSI: ~55 min, 1 wasted render (2 min) and 1 silent no-op -> top loss: a render launched on stale files -> fix: md5 check and launch in one step.

@@ -15,7 +15,7 @@ import json, re, subprocess, sys
 import numpy as np
 
 RAW, OUT = sys.argv[1], sys.argv[2]
-SR, N, BPM, BARS, FIRST_KICK_BAR = 44100, 18, 126, 132, 28
+SR, N, BPM, BARS, FIRST_KICK_BAR = 44100, 18, 126, 96, 20
 BAR = 240.0 / BPM
 LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "bass": (5, 1), "music": (6, 2), "lead": (8, 2),
        "chops": (10, 2), "far": (12, 2), "line": (14, 2), "mc": (16, 2)}

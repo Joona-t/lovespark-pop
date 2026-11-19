@@ -1,4 +1,4 @@
-// 10 "Cyber Space Set" · announcer + crowd intro (12 bars), then "Wake Signal (Awake Mix)" · 126 BPM, 132 bars (~4:11)
+// 10 "Cyber Space Set" · announcer + crowd intro (12 bars), then "Wake Signal (Awake Mix)" · 126 BPM, 96 bars (~3:03)
 // Built 2026-11-19 for the club-set video with Ash and Claudio. Announcer and crowd are our own designed voices.
 setcpm(126/4)
 // vocal packs: run tools/live/server.py (serves samples/ locally)
@@ -82,7 +82,7 @@ const sing = s(`<
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forallof sing_my] sing_life>`)
   .hpf(300).room(.25).delay(.15).delaytime(3/8).delayfeedback(.3).gain(.5).orbit(6)
 // "six, seven ... can you feel it": the whole lyric (Joona, 2026-11-19), once every 8 bars (Joona: "too many vocals")
-const sixSeven = s("<[sultry_six ~ ~ ~ sultry_seven ~ ~ ~] ~ sultry_feelit ~ ~ ~ ~ ~>")   // six on 1, seven on 3, a bar of air, then the question
+const sixSeven = s("<[sultry_six ~ ~ ~ sultry_seven ~ ~ ~] ~ sultry_feelit ~!13>")   // once per 16 bars: six on 1, seven on 3, a bar of air, then the question (Joona: "appears too often")   // six on 1, seven on 3, a bar of air, then the question
   .room(.3).delay(.25).delaytime(3/8).delayfeedback(.35).gain(.85).orbit(6)
 
 // the announcer over a cheering crowd; the set starts on bar 13
@@ -95,16 +95,16 @@ const announce = stack(
 // Joona, 2026-11-19: a structure rework (experiments/10b) was tried and rejected: "last version was better".
 // Kept from it: only the ear-to-ear drift of the plucks in the outro.
 arrange(
+  // about 3 minutes (Joona, 2026-11-19: "lets end it around 3 minutes"): 96 bars at 126 BPM = 3:03
   [12, announce],
-  [8,  stack(plucks(.5, 2), silence)],                                               // no hats alone over the plucks
-  [8,  stack(plucks(2, 3.5), far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
-  [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],
-  [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven.mask("<0!8 1!8>"))],
-  [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],
-  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops.mask("<0!6 1!2>"))],
-  [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ ~ ~ ~ ~ ~ sultry_feelit:1>"))],
-  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],
-  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],
-  [8,  stack(kick, hats, bass(Aroots), plucks(4, 2).pan(sine.range(.25, .75).slow(2)), far("<[sultry_six ~ ~ ~ sultry_seven ~ ~ ~] ~ ~ ~ ~ ~ ~ ~>"))],
-  [8,  stack(plucks(2, .3).pan(sine.range(.06, .94).slow(2)), far("<~ ~ ~ ~ ~ ~ sultry_feelit ~>"))],
+  [8,  stack(plucks(1, 3.5), silence)],                                              // intro: plucks open up, no ticking hats
+  [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],                 // build
+  [8,  stack(drums, bass(Aroots), plucks(3, 4.5), lead, sixSeven)],                  // A: the line, first time
+  [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],              // breakdown
+  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, sixSeven, chops.mask("<0!6 1!2>"))],   // drop: the line, second time
+  [8,  stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                            // B: Ash's dance
+  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],   // bridge
+  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],   // final drop: third time
+  [4,  stack(kick.mask("<1 1 0 0>"), bass(Aroots).mask("<1 1 0 0>"), plucks(3, .3).pan(sine.range(.06, .94).slow(2)))],           // outro: ear to ear, out
 )
+
