@@ -62,28 +62,29 @@ const leadB = bell(`<
 const leadHigh = lead.add(note(12)).gain(.2).pan(.7)
 
 // Rose (orbits 4 and 5)
+// "wake up" is out of the arrangement for now (Joona, 2026-11-19); samples and this line kept
 const wake = s("<vox_wakeup ~ vox_wakeup:1 ~>").delay(.5).delaytime(3/8).delayfeedback(.5).room(.5).gain(.9).orbit(4)
 const chops = s("vox_ah").struct("~ [~ x] ~ [x x] ~ [~ x] [~ x] ~").begin(.08).clip(.45)
   .speed("<1 1 1.19 .89>").hpf(400).pan(sine.fast(4).range(.25, .75)).room(.5).gain(.5).orbit(4)
 const hey = s("<~ ~ ~ [~ ~ ~ vox_hey]>").speed(1.1).room(.5).gain(.6).orbit(4)
 const far = (name) => s(name).hpf(500).room(.8).roomsize(6).delay(.4).delaytime(3/8).delayfeedback(.5).gain(.65).orbit(5)
 
-// "I've been waiting for this ... for such a long time / ... for all of my life": faint, pitched, 8 bars
+// The sung line is out of the arrangement (Joona, 2026-11-19: "remove the i have been waiting for this"); samples and this line kept
 const sing = s(`<
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forsucha sing_long] sing_time
   [sing_ivebeen sing_waiting sing_forthis@2] ~ [sing_forallof sing_my] sing_life>`)
-  .hpf(300).room(.6).roomsize(4).delay(.35).delaytime(3/8).delayfeedback(.45).gain(.5).orbit(4)
+  .hpf(300).room(.25).delay(.15).delaytime(3/8).delayfeedback(.3).gain(.5).orbit(6)
 
 arrange(
   [8,  stack(plucks(.5, 2), hats.gain(.3), far("<~ ~ ~ vox_hearme ~ ~ ~ ~>"))],
-  [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ vox_hearme:1 ~ ~ ~ [~ ~ vox_wakeup ~]>"))],
+  [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ vox_hearme:1 ~ ~ ~ ~>"))],
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],
   [16, stack(drums, bass(Aroots), plucks(3, 4.5), lead, far("<~!7 [~ ~ ~ vox_signal]>"), chops.mask("<0!8 1!8>"))],
-  [8,  stack(pad(A, 800, 3000), sing.gain(.6), riser, roll)],
-  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead.mask("<1!8 0!8>"), sing.mask("<0!8 1!8>"), wake.mask("<1!8 0!8>"), chops, hey)],
+  [8,  stack(pad(A, 800, 3000), lead.lpf(1500).gain(.3), riser, roll)],
+  [16, stack(drums, bass(Aroots), plucks(4, 4.5), pad(A, 2600, 3400), lead, chops, hey)],
   [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB, far("<~ ~ vox_follow ~ ~ ~ vox_follow:1 ~>"))],
-  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), sing.gain(.6), riser)],
-  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead.mask("<1!8 0!8>"), leadHigh, sing, chops, hey)],
+  [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser)],
+  [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, chops, hey)],
   [8,  stack(kick, hats, bass(Aroots), plucks(4, 2), far("<vox_signal ~ ~ ~ vox_signal:1 ~ ~ ~>"))],
   [8,  stack(hats.gain(.3), plucks(2, .3), far("<~ ~ ~ ~ ~ ~ vox_awake:1 ~>"))],
 )

@@ -54,3 +54,13 @@ Root cause: natural pitch movement was kept around the whole phrase's median, so
 Root cause: a later `.gain` overrides the gain set inside `off`. Fix: set the main gain before `.off`. Caught by reading event gains off the playing pattern.
 
 RSI: ~70 min, 4 detours (no ASR/vocoder ready on the Mac, blocked publish, 2 tuning fixes) -> top loss: finding a working voice + ASR + vocoder route from scratch (~25 min) -> fix: `tools/sing.py` and the venv now exist; the route (ashley-pc qwen env, venv-asr) is written in the brain note.
+
+## ITER-007 (2026-11-19): 09 pared back on Joona's ear
+Joona heard 09: "wake up" out ("keep it safe"), the sung line sounded too watery, then "too many lyrics is not good ... very minimalistic", "no robotic voices", and finally "remove the i have been waiting for this". Both are out of the arrangement (0 events each over 120 bars, checked on the playing pattern); the bell lead is back in the drops. Samples and the pattern lines are kept. Still in: "can you hear me", "signal", "follow the signal", "I'm awake now", ah-chops, hey.
+Live page: `// @keep` swaps in an edited arrangement at the bar the current one has reached. `tools/sing.py` gained a one-file mode without time-stretching (`--notes`, `--keep`, `--formant`).
+Lessons: (1) his dictation garbles words, so a surprising instruction ("robotic voices") gets a one-line check before work; I built a robot voice he never asked for. (2) WORLD-stretched speech sounded watery to him; any future sung vocal should come from a singing model (ACE-Step), not stretched speech.
+
+## BUG-006 (2026-11-19): the voice audition never played
+Root cause: `${v}` interpolation inside a backtick string; Strudel treats backtick strings as mini-notation, so the eval failed and the old track kept playing. Caught by reading evalError after the push. Rule: build pattern strings with ordinary quotes and `+`.
+
+RSI: ~30 min, 2 wasted builds (robot voice, audition) -> top loss: acting on a garbled dictated instruction -> fix: confirm in one line when an instruction contradicts the direction so far.

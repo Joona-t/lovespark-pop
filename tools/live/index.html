@@ -63,7 +63,9 @@
       if (started) {
         await m.evaluate();
         // "// @top" starts an arranged track from its bar 1 on the launch bar.
-        if (/@top\b/.test(code) && m.repl.state.pattern) m.repl.setPattern(m.repl.state.pattern.late(target));
+        // "// @keep" swaps in an edited arrangement at the bar the current one has reached.
+        if (/@keep\b/.test(code) && m.repl.state.pattern && window.__topAt != null) m.repl.setPattern(m.repl.state.pattern.late(window.__topAt));
+        else if (/@top\b/.test(code) && m.repl.state.pattern) { m.repl.setPattern(m.repl.state.pattern.late(target)); window.__topAt = target; }
         dot.classList.add('on');
       }
       status.textContent = label;
