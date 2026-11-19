@@ -900,6 +900,7 @@ function frame(bar, dt) {
       c.vrm.update(dt);
     }
   });
+  renderer.toneMappingExposure = 1 - smooth((bar - 99) / 4.9);                             // the picture fades to black with the music
   poseBall(bar, energy, pulse);
   if (visorTex) visorTex.offset.x = (bar * .25) % 1;                                        // the rainbow drifts across the lens
   poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseRiders(bar); poseRing(bar); poseMC(bar, sec, pulse, dt);

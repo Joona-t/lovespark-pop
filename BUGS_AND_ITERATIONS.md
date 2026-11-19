@@ -266,3 +266,14 @@ RSI: ~40 min, 1 tongue-placement round -> no loss worth fixing (the md5-and-laun
 Not audited by measurement: the 54 crowd dancers and the Claudios beyond the earlier screenshot checks.
 
 RSI: ~45 min, 3 audit scans -> top loss: two scans built on the wrong reading of the screenshot (about 6 min) -> fix: work out the camera's view of the pose before measuring.
+
+## ITER-026 (2026-11-19): video v6: a fade-out ending
+Joona on v5: "don't have that stuttering at the end. Just lower it down. Like have the music kind of fade out at the right point." The outro is now a steady groove (kick, clap, hats, bass, plucks, pad) for its 8 bars with no parts dropping in and out and no last hit; `mix.py` fades the master from bar 97 to the end (measured every 2 s from 2:56: -15 -15 -15 -16 -16 -16 -17 -18 -22 -25 -33 dB) and the picture fades to black with it. 198.1 s (3:18), -14.2 LUFS, -1.4 dBTP. Rendered on both Forge cards.
+
+## BUG-013 (2026-11-19): a stem capture lost its drums near the end
+The first v6 capture had the kick and drum buses silent for bars 97-99 and 103-104 (and thin in 95-96) while bass and music played; the pattern has four kicks in each of those bars. Found by measuring the fade, which dipped 10 dB and came back. Most likely cause: the Browser pane was hidden and the page's audio was disconnected from the speakers, so the browser throttled the page and late drum hits were skipped; the re-capture with the pane visible was clean. Not proven beyond that one clean re-run. Earlier masters (v3 to v5) were never kick-counted, so their endings may have had the same fault. Check added: `mix.py` prints every bar with fewer than four kicks. Rule: capture stems with the pane visible.
+
+## BUG-014 (2026-11-19): a capture died on a full disk and the wait never ended
+The Mac had 790 MB free; the capture's appends failed a minute in and my wait loop (no time limit, a size threshold the file never reached) sat for 17 minutes. Fix: waits have a limit and report the length; old stem captures are deleted once a master is made (takes 4 to 8 removed, 2.4 GB+).
+
+RSI: ~50 min for a fade, 2 failed captures -> top loss: 17 min of unbounded waiting on a full disk -> fix: bounded waits, a disk check before a capture, and the kick gate.

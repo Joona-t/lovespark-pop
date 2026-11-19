@@ -102,11 +102,9 @@ arrange(
   [16, stack(kick, clap, fill, hats, rim, bass(Broots), arps, pad(B, 1500, 4200), leadB)],                           // B: Ash's dance
   [8,  stack(halfTime, sub(Aroots), pad(A, 600, 5000), lead.lpf(2000).gain(.3), riser, far("<~ ~ ~ ~ ~ sultry_feelit:1 ~ ~>"))],   // bridge
   [16, stack(drums, rim, bass(Aroots), plucks(4.5, 5), pad(A, 3000, 4500), lead, leadHigh, sixSeven, chops.mask("<0!6 1!2>"))],   // final drop: third time
-  // a clean ending: the groove thins over four bars, the plucks drift ear to ear and close, then one last hit on the home chord rings out
-  [8,  stack(kick.mask("<1 1 1 1 0 0 0 0>"), clap.mask("<1 1 0 0 0 0 0 0>"), hats.mask("<1 1 1 0 0 0 0 0>"), bass(Aroots).mask("<1 1 1 1 0 0 0 0>"),
-             plucks(3.5, .3).pan(sine.range(.06, .94).slow(2)).mask("<1!7 0>"), pad(A, 2400, 600).mask("<0 0 0 0 1 1 1 0>"),
-             chord("<~!7 Fm9>").voicing().s("supersaw").unison(5).spread(.8).lpf(2600).attack(.01).release(3.2).room(.6).gain(.32).orbit(2),
-             s("<~!7 bd>").bank("RolandTR909").shape(.25).gain(1.05).orbit(9), s("<~!7 cp>").bank("RolandTR909").room(.6).gain(.5))],
+  // the ending (Joona: "don't have that stuttering at the end. Just lower it down ... fade out"): the groove simply carries on,
+  // steady, while the master fades it out over these 8 bars (tools/mix.py); nothing drops in and out, no last hit
+  [8,  stack(kick, clap, hats, bass(Aroots), plucks(4, 2.5), pad(A, 2600, 1800))],
 )
 
 

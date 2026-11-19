@@ -17,6 +17,7 @@ import numpy as np
 RAW, OUT = sys.argv[1], sys.argv[2]
 SR, N, BPM, BARS, FIRST_KICK_BAR = 44100, 18, 126, 104, 8
 BAR = 240.0 / BPM
+FADE_FROM_BAR = 96                                   # the outro starts here (0-based); the music fades from this bar to the end
 LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "bass": (5, 1), "music": (6, 2), "lead": (8, 2),
        "chops": (10, 2), "far": (12, 2), "line": (14, 2), "mc": (16, 2)}
 db = lambda v: -200.0 if v <= 0 else 20 * np.log10(v)
@@ -52,7 +53,15 @@ print(f"full mix as played: peak {db(peak['master']):+.1f} dBFS  ->  {'CLIPS at 
 
 # 2. bar 1
 t0 = kick_on / SR - FIRST_KICK_BAR * BAR
-dur = BARS * BAR + 2.5
+dur = BARS * BAR
+# kick gate: a capture made with the browser pane hidden lost drum hits (BUG-013). Count the kicks on each beat of every bar.
+_k = np.abs(np.asarray(x[:, 2], dtype=np.float64)); _t0 = kick_on / SR - FIRST_KICK_BAR * BAR; thin = []
+for b in range(FIRST_KICK_BAR, BARS):
+    seg = _k[int((_t0 + b * BAR) * SR): int((_t0 + (b + 1) * BAR) * SR)]
+    n = sum(seg[int(i * len(seg) / 4): int(i * len(seg) / 4) + int(.08 * SR)].max() > 0.2 * kmax for i in range(4)) if len(seg) else 0
+    if n < 4:
+        thin.append((b + 1, int(n)))
+print("bars with fewer than 4 kicks (expect only fills, the breakdown and the half-time bridge):", thin)
 print(f"first kick at {kick_on / SR:.3f} s -> bar 1 at {t0:.3f} s; master length {dur:.2f} s")
 if t0 < 0:
     sys.exit("bar 1 falls before the start of the capture")
@@ -78,7 +87,7 @@ graph = ";".join([
     st("mc", "highpass=f=90,acompressor=threshold=-22dB:ratio=3:attack=8:release=120:makeup=1.5"),
     "[drumbus][bass][music][lead][chops][far][line][mc]amix=inputs=8:normalize=0,"
     "acompressor=threshold=-15dB:ratio=1.5:attack=30:release=220:knee=6:makeup=1,"
-    f"afade=t=in:st=0:d=0.02,afade=t=out:st={dur - 1.2:.2f}:d=1.2[mix]",
+    f"afade=t=in:st=0:d=0.02,afade=t=out:st={FADE_FROM_BAR * BAR:.2f}:d={dur - FADE_FROM_BAR * BAR:.2f}:curve=qsin[mix]",   # the long fade-out over the outro
 ])
 src = ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", str(N), "-ss", f"{t0:.4f}", "-t", f"{dur:.3f}", "-i", RAW]
 premix = OUT + "-premaster.wav"
