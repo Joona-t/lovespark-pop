@@ -478,7 +478,7 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
   camOverride = cam; nameSigns.forEach((m) => { m.visible = names; });
   for (let i = 0; i < settle; i++) frame(bar, 1 / 60);
   const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
-  const res = await fetch('/save/' + name, { method: 'POST', body: blob });
+  const res = await fetch('/save/' + name, { method: 'POST', headers: { 'X-Club-Save': '1' }, body: blob });
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }

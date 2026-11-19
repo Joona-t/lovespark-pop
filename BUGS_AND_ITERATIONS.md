@@ -131,3 +131,16 @@ RSI: ~25 min, 4 look-fix rounds -> top loss: arm rotations found by trial (3 rou
 Verified on the playing pattern: 12 structural checks (stabs only in A1, shaker 8 vs 24 hits, no plucks in the drop's first 4 bars, silence then vocal at the bridge's end, toms only in the final drop's second half, 10 uplifters). A full take is being recorded from the live output for loudness measurement and mastering.
 
 RSI: ~40 min, 2 re-renders of the art -> top loss: a hidden object's light kept lighting the scene, found only when a still was looked at -> fix: light intensity follows visibility; every still is reviewed with a guide before delivery.
+
+## ITER-017 (2026-11-19): the structure rework was rejected; restored, with three notes applied
+Joona heard ITER-016's rework live: "remove the metronome", "last version was better", "that acid bass doesnt fit", "67 can you feel it plays too fast needs to be more spaced out". Then he pasted a description of John Summit's style: rolling bass, crisp swung percussion, euphoric top end, sticky vocal hooks, clean mixdown, and "every 8 or 16 bars ... a subtle rhythmic switch, filter sweep, or percussive fill".
+- Track 10 is restored to the arrangement before the rework. The rework is kept at `patterns/experiments/10b-structure-rework.strudel.js`.
+- Kept from it: only the ear-to-ear drift of the outro plucks.
+- New: the vocal is spaced out (six on beat 1, seven on beat 3, a bar of air, then the question); the bass filter is rounder (resonance 9 -> 2, envelope 3 -> 1.3).
+- The "metronome" was most likely the toms the rework added (no tom events remain); the first reading (the intro hats) was wrong and that removal is undone with the restore.
+Lesson: the rework changed about ten things in one pass, so one "worse" from him could not say which. Summit-style variation goes in one subtle touch per listen from here, each one vetoed or kept by ear.
+
+## Security fix: the `/save/` route (found by the commit security review)
+`POST /save/<name>` wrote files with no origin check, so any page open in the same browser could have posted to it. Now: Origin must be this server's own address, a custom `X-Club-Save: 1` header is required (a cross-site form cannot send it), and the body is streamed to disk. Checked: a POST without the header returns 403.
+
+RSI: ~35 min on a rework that was reverted -> top loss: ten musical changes in one pass against a listener who judges by ear -> fix: one change per listen, announced before he hears it.
