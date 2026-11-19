@@ -44,17 +44,37 @@
   let started = false, latest = null, pushes = 0;
   const mirror = () => ed.editor;
   function logLine(t) { const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString() + '  ' + t; log.prepend(d); }
+  // Launch quantization, like Ableton: a push waits for the next bar line.
+  // "// @q 4" in the code waits for the next 4-bar phrase; "// @q 0" plays at once. Default: 1 bar.
   async function play(code) {
     const m = mirror(); if (!m) return;
-    m.setCode(code);
-    if (started) { await m.evaluate(); dot.classList.add('on'); }
+    const q = +((code.match(/@q\s+(\d+)/) || [])[1] ?? 1);
+    const sch = m.repl?.scheduler;
+    let wait = 0;
+    if (started && q > 0 && sch?.started) {
+      const now = sch.now(), target = Math.ceil((now + 0.02) / q) * q;
+      wait = Math.max(0, (target - now) / sch.cps * 1000 - 60);
+      status.textContent = `queued: plays in ${(wait / 1000).toFixed(1)} s (next ${q}-bar line)`;
+    }
+    const label = status.dataset.label || '';
+    const target = sch?.started ? Math.ceil((sch.now() + 0.02) / Math.max(q, 1)) * Math.max(q, 1) : 0;
+    setTimeout(async () => {
+      m.setCode(code);
+      if (started) {
+        await m.evaluate();
+        // "// @top" starts an arranged track from its bar 1 on the launch bar.
+        if (/@top\b/.test(code) && m.repl.state.pattern) m.repl.setPattern(m.repl.state.pattern.late(target));
+        dot.classList.add('on');
+      }
+      status.textContent = label;
+    }, wait);
   }
   const es = new EventSource('/events');
   es.onmessage = (e) => {
     const { code, file } = JSON.parse(e.data);
     latest = code; pushes++;
     const first = (code.split('\n')[0] || '').replace(/^\/\/\s*/, '');
-    status.textContent = `${file} · update ${pushes} · ${first}`;
+    status.textContent = status.dataset.label = `${file} · update ${pushes} · ${first}`;
     logLine(first || 'update');
     play(code);
   };

@@ -12,7 +12,7 @@ See `research.md` for the findings and `plan.md` for the build order.
 ```
 python3 tools/live/server.py
 ```
-Open http://127.0.0.1:4321 and click **Start**. Every save of `patterns/live.strudel.js` plays in the page within a quarter second, over a beat-synced glyph-grid background. Strudel's own **Export to WAV** (strudel.cc, export tab) renders a finished pattern to audio.
+Open http://127.0.0.1:4321 and click **Start**. Every save of `patterns/live.strudel.js` plays in the page within a quarter second, over a beat-synced glyph-grid background. Directives in a pushed file: `// @q 4` launches on the next 4-bar line (default 1 bar, `@q 0` immediately, like Ableton's launch quantization); `// @top` starts an arranged track from its bar 1. Strudel's own **Export to WAV** (strudel.cc, export tab) renders a finished pattern to audio.
 
 ## Layout
 - `patterns/` — Strudel patterns, one file per track (AGPL-3.0, see `patterns/LICENSE`).
