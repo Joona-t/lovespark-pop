@@ -57,30 +57,38 @@
   function logLine(t) { const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString() + '  ' + t; log.prepend(d); }
   // Launch quantization, like Ableton: a push waits for the next bar line.
   // "// @q 4" in the code waits for the next 4-bar phrase; "// @q 0" plays at once. Default: 1 bar.
+  // The swap happens LEAD ms early, with the old pattern kept up to the bar line and the new one from it,
+  // so notes that start exactly on the launch bar are scheduled in time (a 60 ms lead dropped them).
+  const LEAD = 450;
   async function play(code) {
     const m = mirror(); if (!m) return;
     const q = +((code.match(/@q\s+(\d+)/) || [])[1] ?? 1);
     const sch = m.repl?.scheduler;
-    let wait = 0;
-    if (started && q > 0 && sch?.started) {
-      const now = sch.now(), target = Math.ceil((now + 0.02) / q) * q;
-      wait = Math.max(0, (target - now) / sch.cps * 1000 - 60);
-      status.textContent = `queued: plays in ${(wait / 1000).toFixed(1)} s (next ${q}-bar line)`;
-    }
     const label = status.dataset.label || '';
-    const target = sch?.started ? Math.ceil((sch.now() + 0.02) / Math.max(q, 1)) * Math.max(q, 1) : 0;
-    setTimeout(async () => {
+    if (!(started && sch?.started)) {                                    // first start: nothing to stitch
       m.setCode(code);
-      if (started) {
-        await m.evaluate();
-        // "// @top" starts an arranged track from its bar 1 on the launch bar.
-        // "// @keep" swaps in an edited arrangement at the bar the current one has reached.
-        if (/@keep\b/.test(code) && m.repl.state.pattern && window.__topAt != null) m.repl.setPattern(m.repl.state.pattern.late(window.__topAt));
-        else if (/@top\b/.test(code) && m.repl.state.pattern) { m.repl.setPattern(m.repl.state.pattern.late(target)); window.__topAt = target; }
-        dot.classList.add('on');
+      if (started) { await m.evaluate(); if (/@top\b/.test(code)) window.__topAt = 0; dot.classList.add('on'); }
+      return;
+    }
+    const step = Math.max(q, 1), now = sch.now();
+    let target = Math.ceil((now + 0.02) / step) * step;
+    if ((target - now) / sch.cps * 1000 < LEAD + 150) target += step;      // too close: take the next line
+    const wait = q > 0 ? (target - now) / sch.cps * 1000 - LEAD : 0;
+    if (q > 0) status.textContent = `queued: plays in ${((wait + LEAD) / 1000).toFixed(1)} s (next ${q}-bar line)`;
+    setTimeout(async () => {
+      const old = sch.pattern;
+      m.setCode(code);
+      await m.evaluate();
+      let neu = m.repl.state.pattern;
+      if (neu && !m.repl.state.evalError) {
+        // "// @keep" swaps in an edited arrangement at the bar the current one has reached; "// @top" starts it at bar 1.
+        if (/@keep\b/.test(code) && window.__topAt != null) neu = neu.late(window.__topAt);
+        else if (/@top\b/.test(code)) { neu = neu.late(target); window.__topAt = target; }
+        if (q > 0 && old) m.repl.setPattern(stack(old.filterHaps(h => h.whole && h.whole.begin < target), neu.filterHaps(h => h.whole && h.whole.begin >= target)));
+        else m.repl.setPattern(neu);
       }
-      status.textContent = label;
-    }, wait);
+      dot.classList.add('on'); status.textContent = label;
+    }, Math.max(0, wait));
   }
   const es = new EventSource('/events');
   es.onmessage = (e) => {

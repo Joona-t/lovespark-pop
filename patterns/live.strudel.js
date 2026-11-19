@@ -1,5 +1,5 @@
-// 09 "Wake Signal (Awake Mix)" · 126 BPM, F minor, 120 bars (~3:49) · vocal: our own designed voice (Qwen3-TTS VoiceDesign)
-// Cooked live 2026-11-19. intro 16 · build 8 · A 16 · break 8 · drop 16 · B 16 · half-time bridge 8 · final drop 16 · outro 16
+// 10 "Cyber Space Set" · announcer + crowd intro (8 bars), then "Wake Signal (Awake Mix)" · 126 BPM, 128 bars (~4:04)
+// Built 2026-11-19 for the club-set video with Ash and Claudio. Announcer and crowd are our own designed voices.
 // @q 4
 // @top
 setcpm(126/4)
@@ -17,6 +17,7 @@ samples(Object.fromEntries(['ivebeen', 'waiting', 'forthis', 'forsucha', 'long',
 // the vocal: one sultry designed voice, two phrases (single quotes: double-quoted strings become patterns)
 samples({ sultry_six: ['sultry__six__s1.wav', 'sultry__six__s2.wav'], sultry_seven: ['sultry__seven__s1.wav', 'sultry__seven__s2.wav'],
   sultry_feelit: ['sultry__feelit__s1.wav', 'sultry__feelit__s2.wav'] }, 'http://localhost:4321/samples/house/')
+samples({ br_mc1: ['mc1__s42.wav'], br_mc2: ['mc2__s42.wav'], br_crowd: ['crowd.wav'] }, 'http://localhost:4321/samples/mc/')
 
 const A = "<Fm9 Db^7 Ab^7 Eb>", Aroots = "<f1 db1 ab0 eb1>"
 const B = "<Db^7 Eb Fm9 Cm7 Db^7 Eb Ab^7 C7>", Broots = "<db1 eb1 f1 c1 db1 eb1 ab0 c1>"
@@ -83,7 +84,15 @@ const sing = s(`<
 const sixSeven = s("<[sultry_six ~ sultry_seven ~ ~ ~ ~ ~] sultry_feelit ~ ~>")
   .room(.3).delay(.25).delaytime(3/8).delayfeedback(.35).gain(.85).orbit(6)
 
+// the announcer over a cheering crowd; the set starts on bar 9
+const announce = stack(
+  s("<br_crowd ~ ~ ~ ~ ~ ~ ~>").gain(.9).orbit(7),
+  s("<br_mc1 ~ ~ ~ ~ br_mc2 ~ ~>").gain(1.1).orbit(7),
+  plucks(.3, 1.2).gain(.3),
+  riser, roll.mask("<0!6 1!2>"))
+
 arrange(
+  [8,  announce],
   [8,  stack(plucks(.5, 2), hats.gain(.3), far("<~ ~ ~ sultry_feelit ~ ~ ~ ~>"))],
   [8,  stack(plucks(2, 3.5), hats.gain(.3), rim, far("<~ ~ ~ sultry_feelit:1 ~ ~ ~ ~>"))],
   [8,  stack(kick, clap, fill, hats, bass(Aroots), plucks(2.5, 4))],

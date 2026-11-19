@@ -73,3 +73,12 @@ Live page: a voice preview panel (one button per verified take, read from `sampl
 Root cause: a generated `samples()` map used double quotes; Strudel turns every double-quoted string into a pattern, so each file path became "[object Object]". Found from the network log and `soundMap`. Fix: single quotes in sample maps. Check after any push that loads samples: the sampler's "done" lines and zero decode errors, not only scheduled events.
 
 RSI: ~50 min, 1 silent failure (~8 min) -> top loss: events were scheduled but no audio had loaded, and my check only counted events -> fix: sample pushes are verified by loaded-file lines and zero decode errors.
+
+## ITER-009 (2026-11-19): "Cyber Space Set" (10): announcer and crowd intro
+For the club-set video with Ash and Claudio. An 8-bar intro before the Awake Mix: an energetic British MC (designed voice) says Joona's two lines over a cheering crowd, a riser and snare roll lead into the set on bar 9. 128 bars, about 4:04. Announcer: 3 takes of each line, all word-perfect by speech recognition; take s42 used. Crowd: 30 shouts from six designed voices, layered 110 times with a synthetic room and a murmur bed (`samples/mc/crowd.wav`, 17 s). Samples local only.
+Verified on the playing pattern: crowd and line 1 on bar 1, line 2 on bar 6, no kick in the intro, roll 24/32 on bars 7-8, set and drop where expected, both samples loaded, no errors.
+
+## BUG-008 (2026-11-19): a launched track lost everything that started exactly on its first bar
+Root cause: the page swapped the pattern in 60 ms before the bar line; the scheduler had already queried that window with the old pattern, so onsets on the launch bar were never scheduled (the announcer's first line and the crowd never triggered; earlier launches lost their first kick unnoticed). Fix: swap 450 ms early with a stitched pattern, old events before the bar line and new ones from it. Check: after a launch, the sampler's load lines for bar-1 samples and the events on the launch bar.
+
+RSI: ~30 min, 1 re-launch -> top loss: BUG-008, found only because sample load lines were missing -> fix: stitched launch; bar-1 load lines are part of the launch check.
