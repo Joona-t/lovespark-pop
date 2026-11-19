@@ -149,3 +149,9 @@ RSI: ~35 min on a rework that was reverted -> top loss: ten musical changes in o
 Joona: "this song is good almost remove the hey". Out of 09 and 10 (0 events over 132 bars on the playing pattern; sample and pattern line kept). Voice samples stay off the public repo (Joona: "no public repo for this").
 
 RSI: ~3 min, 0 re-work -> no loss worth fixing.
+
+## ITER-019 (2026-11-19): Bvby Ash channel art v2 (PFP + banner)
+Joona: "a lime ash pfp and banner pfp of just her banner of her djing in the boiler room set with the claudios". The v1 stills (04:59) had crowd figures over her in the PFP, and in the banner she was small behind the decks with hard dark boards behind the name signs.
+`still()` gains `solo` (hides crowd, MC and Claudios) and `crowdDim` (darkens the crowd so her white suit reads against it). PFP: 1600², bar 30.2, solo, a low 3/4 camera so her eyes show under the visor, the neon heart behind her. Banner: 2560×1440, bar 63.25 (drop, hand up), crowdDim .4, camera at her face height (a higher one put key-light glare on the visor). Checked as crops: the circle at 400 and 120 px, the desktop strip 2560×423 and the 1546×423 safe area (head, decks and a Claudio either side inside both). Files are local in `renders/` (git-ignored).
+
+RSI: ~25 min, 10 test frames -> top loss: framing judged on the full 16:9 before checking the 423 px strip viewers actually see -> fix: guide boxes for the strip and safe area are drawn on every banner test from the first frame.

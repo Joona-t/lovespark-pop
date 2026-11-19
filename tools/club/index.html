@@ -415,7 +415,7 @@ function shotAt(bar, sec) {
   return order[(k + start) % order.length];
 }
 const tmpT = new THREE.Vector3();
-let camOverride = null;                              // a fixed camera for stills
+let camOverride = null, soloHide = [];                              // a fixed camera for stills
 function poseCamera(bar, sec, pulse) {
   if (camOverride) { camera.position.set(...camOverride.p); tmpT.set(...camOverride.t); camera.lookAt(tmpT); return; }
   const sh = SHOTS[shotAt(bar, sec)], t = bar * 1.9, e = sec[2];
@@ -466,6 +466,7 @@ function frame(bar, dt) {
   tubes.forEach((t, i) => t.material.color.setHex(i % 2 ? CYAN : PINK).multiplyScalar(.55 + .45 * pulse));
   bloom.strength = .28 + .14 * energy + .08 * pulse + (drop ? .1 : 0);
   poseCamera(bar, sec, pulse);
+  soloHide.forEach((o) => { o.visible = false; });       // channel-art stills of the DJ alone
   composer.render();
 }
 
@@ -473,12 +474,15 @@ function frame(bar, dt) {
 const ed = document.getElementById('ed'), params = new URLSearchParams(location.search);
 let sched = null, fake = params.has('bar') ? { bar0: +params.get('bar'), t0: performance.now(), hold: params.has('hold') } : null;
 const barNow = () => sched ? sched.now() % BARS : fake ? (fake.hold ? fake.bar0 : (fake.bar0 + (performance.now() - fake.t0) / 1000 * (126 / 240)) % BARS) : 0;
-async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 50 } = {}) {
+async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 50, solo = false, crowdDim = 1 } = {}) {
   renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setSize(w, h); camera.fov = fov; camera.aspect = w / h; camera.updateProjectionMatrix();
   camOverride = cam; nameSigns.forEach((m) => { m.visible = names; });
+  const crowd0 = crowdMat.color.clone(); crowdMat.color.multiplyScalar(crowdDim);   // a darker crowd so the DJ reads against it
+  soloHide = solo ? [bodies, arms, phones, mouths, logos, ...people.map((p) => p.head), mc?.scene, ...claudios.map((c) => c.anchor)].filter(Boolean) : [];
   for (let i = 0; i < settle; i++) frame(bar, 1 / 60);
   const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
   const res = await fetch('/save/' + name, { method: 'POST', headers: { 'X-Club-Save': '1' }, body: blob });
+  soloHide.forEach((o) => { o.visible = true; }); soloHide = []; crowdMat.color.copy(crowd0);
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }
