@@ -175,3 +175,11 @@ Checked by screenshot (decks front and side, pump at bars 65.5 and 105.5, emote 
 Root cause: an end-of-line comment was pasted in front of `claudios.push(c);` on the same line, so no Claudio was registered and none was animated. Caught before commit: the emote screenshot showed no riders, and the rider list read back empty. Check: after a scene edit, read `club.claudios.length` (must be 7) along with the screenshot.
 
 RSI: ~75 min, 3 pose rounds, 3 mix-script reruns -> top loss: all earlier listening was through a clipping output (+4.5 dBFS) that no check measured -> fix: stems capture + `mix.py` measure peak, loudness and the null test on every master; the live page plays with headroom.
+
+## ITER-020 (2026-11-19): sound button, curly MC Spark, Blender dance moves on the stage
+- Joona: "Have the video play and let me watch it work. And if I have a mute option for the sound as well". The club page has a SOUND ON / OFF button (and the M key); the choice survives reloads. Scene tests now run in a second tab so his view keeps playing.
+- Joona: "MC Spark. We have one with curly hair ... a chain around his neck that says ASI in big gold letters". That is the newer model on ashley-pc (`vtuber/mcspark/v3`); it replaces the v2 one here (local `models/`).
+- Joona: "Yes, wire them in". The dances keyframed in Blender on ashley-pc (`vtuber/dance/dance.py`, made by the Claude there) are exported with `tools/blender/export_action.py` (armature and baked action only, 2-5 MB, about 3 s each) and played on the bar clock by `loadMove` / `playMove`: Lime steps back from the decks and dances through the 16-bar B-section (the move's own length), MC Spark dances for the whole set with the mic in his hand. Body bones only; hair and skirt stay on spring physics. Outside a move the code poses run as before.
+Checked in a second tab by screenshot: Lime at bars 80.3, 84.6, 86.5 (the arms-out pose matches the PC's own render of that moment; her upper-arm rotation changes across five sampled bars), MC Spark at bars 3.3 and 66.5; then live in his tab: playing, both moves loaded, 7 Claudios, no console errors. Not checked: the cut into and out of the dance at bars 77 and 93 in motion, a full run.
+
+RSI: ~20 min, 0 re-work -> no loss worth fixing (the skeletons matched on the first try because the moves and the VRMs come from the same Blender files).

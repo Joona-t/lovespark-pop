@@ -20,10 +20,15 @@
   #go { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(5,3,10,.72); z-index:5; }
   #go button { font:700 20px ui-monospace, Menlo, monospace; letter-spacing:.08em; color:#140a10; background:#ff4fb0; border:0;
     border-radius:8px; padding:16px 28px; cursor:pointer; box-shadow:0 0 28px rgba(255,79,176,.6); }
+  #mute { position:fixed; top:14px; right:16px; z-index:6; min-height:44px; padding:0 16px; font:700 14px ui-monospace, Menlo, monospace; letter-spacing:.06em;
+    color:#ffe9f5; background:rgba(12,6,20,.72); border:1px solid #ff4fb0; border-radius:8px; cursor:pointer; }
+  #mute[aria-pressed="true"] { color:#9fb0c8; border-color:#4a5a78; }
+  #mute:focus-visible { outline:2px solid #3ef0ff; outline-offset:2px; }
 </style>
 </head>
 <body>
 <canvas id="stage"></canvas>
+<button id="mute" type="button" aria-pressed="false">SOUND ON</button>
 <div id="go"><button id="start">START THE SET</button></div>
 <strudel-editor id="ed"><!--
 // loading
@@ -354,6 +359,25 @@ const mcTune = { upX: -1.2, upZ: -.5, lowY: -2.1, lowZ: 0 };                    
 new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/mcspark.vrm', (gltf) => {
   const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); tame(vrm); scene.add(vrm.scene); mc = vrm; window.club.mc = vrm;
 }, undefined, (e) => console.error('mc model failed to load', e));
+// ---------- dance moves keyframed in Blender on ashley-pc (vtuber/dance/dance.py), played on the bar clock ----------
+// Each GLB holds one baked action for the character's own skeleton, made at 126 BPM. Only body bones are taken (hair and
+// skirt stay on spring physics). While a move plays it drives the skeleton directly; the code poses take over outside it.
+const BAR_SEC = 240 / 126, moves = {};
+function loadMove(name, file) {
+  new GLTFLoader().load('/models/anim/' + file, (g) => {
+    const src = g.animations[0]; if (!src) return;
+    const tracks = src.tracks.filter((t) => { const [node, prop] = t.name.split('.'); return node.startsWith('J_Bip_') && (prop === 'quaternion' || (prop === 'position' && node === 'J_Bip_C_Hips')); });
+    moves[name] = { clip: new THREE.AnimationClip(name, src.duration, tracks), mixer: null, root: null };
+  }, undefined, () => console.warn('move not found (code poses are used instead): ' + name));
+}
+loadMove('lime_dance', 'lime_dance.glb'); loadMove('mc_dance', 'mc_dance.glb');
+function playMove(name, vrm, seconds) {               // pose the model from the move at this time; false if it is not loaded
+  const mv = moves[name]; if (!mv || !vrm) return false;
+  if (mv.root !== vrm.scene) { mv.mixer = new THREE.AnimationMixer(vrm.scene); mv.mixer.clipAction(mv.clip).play(); mv.root = vrm.scene; }
+  vrm.humanoid.autoUpdateHumanBones = false;
+  const d = mv.clip.duration; mv.mixer.setTime(((seconds % d) + d) % d);
+  return true;
+}
 function poseMC(bar, sec, pulse, dt) {
   if (!mc) return;
   const b = (n) => mc.humanoid.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
@@ -361,6 +385,12 @@ function poseMC(bar, sec, pulse, dt) {
   mc.scene.position.set(-1.3 - 1.75 * ease, 0, 1.7 - .55 * ease); mc.scene.rotation.y = .28 + .5 * ease;
   const talking = name === 'announce' && ((bar < 4.3) || (bar > 5 && bar < 9.6));                       // his two lines
   const sway = Math.sin(beat * Math.PI / 2), hype = talking ? 1 : energy;
+  if (playMove('mc_dance', mc, bar * BAR_SEC)) {       // the Blender dance keeps the mic by his mouth; only his mouth is driven here
+    mc.expressionManager?.setValue('aa', talking ? .35 + .35 * Math.abs(Math.sin(beat * Math.PI * 3.3)) : 0);
+    if (!mcSettled) { mc.springBoneManager?.reset(); mcSettled = true; }
+    mc.update(dt); return;
+  }
+  mc.humanoid.autoUpdateHumanBones = true;
   if (b('hips')) b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * hype) * pulse;
   b('spine')?.rotation.set(.04, sway * .12 * (.4 + hype), sway * .05);
   b('head')?.rotation.set(talking ? -.08 + .06 * Math.sin(beat * Math.PI * 2) : .05 * pulse, sway * .14, 0);
@@ -429,6 +459,14 @@ function pumpAt(bar, sec) {
 function poseAsh(bar, sec, pulse, dt) {
   if (!ash) return;
   const emo = emoteAt(bar), pump = pumpAt(bar, sec);
+  const dancing = sec[1] === 'B' && playMove('lime_dance', ash, (bar - sec[0]) * BAR_SEC);
+  ash.scene.position.z = dancing ? -.32 : .1;         // off the decks to dance, back to them after
+  if (dancing) {
+    ash.expressionManager?.setValue('happy', .6);
+    if (!settled) { ash.springBoneManager?.reset(); settled = true; }
+    ash.update(dt); ash.scene.updateMatrixWorld(true); return;
+  }
+  ash.humanoid.autoUpdateHumanBones = true;
   const h = ash.humanoid, b = (n) => h.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
   const sway = Math.sin(beat * Math.PI / 2), wave = name === 'announce' ? 1 : 0;
   b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * energy) * pulse;
@@ -564,7 +602,7 @@ async function still(name, w, h, bar, cam, { names = false, fov = 38, settle = 5
   camOverride = null; nameSigns.forEach((m) => { m.visible = false; }); camera.fov = 38; renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); resize();
   return { name, bytes: blob.size, saved: res.ok };
 }
-window.club = { still, POSE, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
+window.club = { still, POSE, moves, claudios, emoteAt, pumpAt, handPos, render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
   resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
 if (fake) document.getElementById('go').remove();
 document.getElementById('start')?.addEventListener('click', async () => {
@@ -575,7 +613,7 @@ document.getElementById('start')?.addEventListener('click', async () => {
   const attach = stemName ? await captureStems(stemName, getAudioContext()) : null;
   m.setCode(code); await m.evaluate();
   if (attach) attach();
-  else getSuperdoughAudioController().output.destinationGain.gain.value = .56;   // the layers sum to +4.5 dBFS (measured from stems): -5 dB keeps the live output from clipping
+  else applySound();
   sched = m.repl.scheduler; fake = null; document.getElementById('go').remove();
   if (stemName) { const t = setInterval(() => { if (sched.now() >= BARS + 1.6) { clearInterval(t); window.club.stems.stop().then(() => m.stop?.()); } }, 400); }
 });
@@ -610,6 +648,20 @@ async function captureStems(name, ctx) {
     st.stop = async () => { st.state = 'stopping'; flush(); await queue; st.state = 'saved'; };
   };
 }
+// ---------- sound on/off: a button (or the M key); the choice is remembered across reloads ----------
+const muteBtn = document.getElementById('mute');
+let muted = false; try { muted = localStorage.getItem('clubMuted') === '1'; } catch {}
+function applySound() {
+  muteBtn.textContent = muted ? 'SOUND OFF' : 'SOUND ON'; muteBtn.setAttribute('aria-pressed', String(muted));
+  if (params.has('stems')) return;                    // a stem capture runs silent on its own
+  let c = null; try { c = getSuperdoughAudioController(); } catch {}
+  // the layers sum to +4.5 dBFS (measured from stems): 0.56 (-5 dB) keeps the live output from clipping
+  if (c?.output?.destinationGain) c.output.destinationGain.gain.value = muted ? 0 : .56;
+}
+function toggleSound() { muted = !muted; try { localStorage.setItem('clubMuted', muted ? '1' : '0'); } catch {} applySound(); }
+muteBtn.addEventListener('click', toggleSound);
+addEventListener('keydown', (e) => { if (e.key === 'm' || e.key === 'M') toggleSound(); });
+applySound();
 let last = performance.now();
 (function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(barNow(), dt); window.club.frames++; requestAnimationFrame(loop); })(last);
 </script>
