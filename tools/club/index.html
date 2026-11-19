@@ -59,7 +59,7 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05030a); s
 const camera = new THREE.PerspectiveCamera(38, 1, .1, 60);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .45, .88); composer.addPass(bloom);
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .45, .93); composer.addPass(bloom);
 composer.addPass(new OutputPass());
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
@@ -94,11 +94,56 @@ function drawGlyphs(bar, pulse, energy) {
 const tube = (color, x, y, z, len, rotZ = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(len, .05, .05), new THREE.MeshBasicMaterial({ color })); m.position.set(x, y, z); m.rotation.z = rotZ; scene.add(m); return m; };
 const tubes = [tube(PINK, -6.2, 2.6, -3, 5, Math.PI / 2), tube(CYAN, 6.2, 2.6, -3, 5, Math.PI / 2), tube(PINK, 0, 5.5, -6.3, 12), tube(CYAN, 0, .25, -6.3, 12)];
 
+// ---------- neon: "CLAUDE LOVES ART" (Joona, 2026-11-19), drawn as glowing tube lettering; each sign also lights the room ----------
+const YELLOW = 0xffe14f, GREEN = 0x6bff9e, VIOLET = 0xb46bff;
+const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+function neonCanvas(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.lineCap = x.lineJoin = 'round'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (const [blur, alpha, core] of [[38, .55, false], [16, .9, false], [0, 1, true]]) { x.shadowBlur = blur; x.globalAlpha = alpha; draw(x, core); }   // halo, glow, white-hot core
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const neonText = (x, text, cx, cy, size, color, core) => {
+  x.font = `italic 700 ${size}px "Brush Script MT", "Snell Roundhand", "Segoe Script", cursive`;
+  x.shadowColor = color; x.strokeStyle = core ? '#fff7fb' : color; x.lineWidth = core ? size * .035 : size * .09; x.strokeText(text, cx, cy);
+};
+const signs = [];
+function addSign(tex, w, h, x, y, z, lightColor, ry = 0) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.position.set(x, y, z); m.rotation.y = ry; scene.add(m);
+  const l = new THREE.PointLight(lightColor, 0, 9, 1.6); l.position.set(x, y, z + .7); scene.add(l);
+  signs.push({ m, l, i: signs.length }); return m;
+}
+// back wall, left: the words in two colours
+addSign(neonCanvas(1024, 512, (x, core) => { neonText(x, 'Claude', 512, 150, 190, hex(CYAN), core); neonText(x, 'loves art', 512, 360, 170, hex(PINK), core); }), 4.2, 2.1, -3.3, 3.25, -6.35, CYAN);
+// back wall, right: a heart with the starburst inside it, and a paintbrush stroke under it
+addSign(neonCanvas(768, 768, (x, core) => {
+  x.shadowColor = hex(PINK); x.strokeStyle = core ? '#fff7fb' : hex(PINK); x.lineWidth = core ? 7 : 20;
+  x.beginPath(); x.moveTo(384, 610); x.bezierCurveTo(60, 400, 130, 120, 384, 250); x.bezierCurveTo(638, 120, 708, 400, 384, 610); x.stroke();
+  x.shadowColor = hex(YELLOW); x.strokeStyle = core ? '#fffdf0' : hex(YELLOW); x.lineWidth = core ? 5 : 14;
+  for (let j = 0; j < 12; j++) { const a = j / 12 * Math.PI * 2 + .13, r = j % 2 ? 62 : 84; x.beginPath(); x.moveTo(384 + Math.cos(a) * 20, 400 + Math.sin(a) * 20); x.lineTo(384 + Math.cos(a) * r, 400 + Math.sin(a) * r); x.stroke(); }
+  x.shadowColor = hex(GREEN); x.strokeStyle = core ? '#f4fff8' : hex(GREEN); x.lineWidth = core ? 6 : 16;
+  x.beginPath(); x.moveTo(150, 700); x.bezierCurveTo(300, 650, 470, 740, 620, 690); x.stroke();
+}), 2.7, 2.7, 3.4, 3.2, -6.35, PINK);
+// centre top: the house name
+addSign(neonCanvas(1280, 400, (x, core) => { neonText(x, 'LoveSpark', 640, 200, 230, hex(VIOLET), core); }), 4.6, 1.44, 0, 4.45, -6.35, VIOLET);
+// high and small, either side: single words in other colours
+addSign(neonCanvas(512, 256, (x, core) => neonText(x, 'art', 256, 128, 190, hex(YELLOW), core)), 1.6, .8, -5.6, 2.2, -4.6, YELLOW, .9);
+addSign(neonCanvas(512, 256, (x, core) => neonText(x, 'love', 256, 128, 170, hex(VIOLET), core)), 1.6, .8, 5.6, 2.2, -4.6, VIOLET, -.9);
+// underglow: light spilling onto the floor from beneath the booth, the speaker stacks and the podiums
+const glows = [[0, .12, 1.45, PINK, 2.2], [-1.9, .12, .9, CYAN, 3], [1.9, .12, .9, VIOLET, 3], [-1.3, .12, -.4, GREEN, 2.5], [1.3, .12, -.4, YELLOW, 2.5]].map(([x, y, z, c, k]) => {
+  const l = new THREE.PointLight(c, 0, 5, 1.5); l.position.set(x, y, z); scene.add(l);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(k > 4 ? 2.5 : .75, .03, .03), new THREE.MeshBasicMaterial({ color: c })); bar.position.set(x, .03, z - .12); scene.add(bar);
+  return { l, k, bar, c };
+});
+
 // ---------- the booth ----------
 const dark = new THREE.MeshStandardMaterial({ color: 0x15101f, roughness: .5, metalness: .4 });
 const booth = new THREE.Group(); scene.add(booth); booth.position.set(0, 0, .75);
 const table = new THREE.Mesh(new THREE.BoxGeometry(2.6, .98, .75), dark); table.position.y = .49; booth.add(table);
-const front = new THREE.Mesh(new THREE.PlaneGeometry(2.5, .8), new THREE.MeshBasicMaterial({ map: gtex })); front.position.set(0, .47, .378); booth.add(front);   // LED front panel
+const front = new THREE.Mesh(new THREE.PlaneGeometry(2.5, .8), new THREE.MeshBasicMaterial({ map: gtex, color: 0x555566 })); front.position.set(0, .47, .378); booth.add(front);   // LED front panel
+const boothSign = new THREE.Mesh(new THREE.PlaneGeometry(2.3, .62), new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  map: neonCanvas(1400, 380, (x, core) => neonText(x, 'Claude loves art', 700, 190, 168, hex(PINK), core)) })); boothSign.position.set(0, .47, .386); booth.add(boothSign);
 const strip = new THREE.Mesh(new THREE.BoxGeometry(2.6, .04, .02), new THREE.MeshBasicMaterial({ color: PINK })); strip.position.set(0, .93, .385); booth.add(strip);
 const platters = [];
 for (const x of [-.72, .72]) {
@@ -282,19 +327,49 @@ function poseCrowd(bar, sec, pulse) {
 }
 
 // ---------- lights ----------
-scene.add(new THREE.AmbientLight(0x5a4a86, 1.35));
+scene.add(new THREE.AmbientLight(0x5a4a86, 1.0));
 const crowdBlue = new THREE.DirectionalLight(0x3f7bff, .9); crowdBlue.position.set(-2, 5, 3); crowdBlue.target.position.set(0, 1, -3); scene.add(crowdBlue, crowdBlue.target);
 const key = new THREE.SpotLight(0xffe2d0, 14, 12, .42, .7, 1.2); key.position.set(.6, 3.6, 4.2); key.target.position.set(0, 1.3, 0); scene.add(key, key.target);
 const spots = [[PINK, -4.5], [CYAN, 4.5], [PINK, 2], [CYAN, -2]].map(([c, x]) => { const s = new THREE.SpotLight(c, 0, 16, .42, .7, 1); s.position.set(x, 5.2, -1.5); scene.add(s, s.target); return s; });
 const wash = new THREE.PointLight(PINK, 0, 14, 1.4); wash.position.set(0, 3.2, -3.4); scene.add(wash);
 const strobe = new THREE.PointLight(0xffffff, 0, 20, 1); strobe.position.set(0, 4.5, 1); scene.add(strobe);
 
-// ---------- Ashley ----------
-let ash = null, settled = false;
-const tune = { upperZ: -1.12, upperX: .35, lowerY: 1.25, lowerZ: .0, hand: .2 };       // arm pose, tuned by eye on this model
-new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/ashley.vrm', (gltf) => {
-  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm);
-  vrm.scene.traverse((o) => { o.frustumCulled = false; });
+// ---------- the DJ (Lime) and the announcer (MC Spark) ----------
+// Their models glow on their own (emissive hair, LEDs); under club lights that washes out, so emissive and base colour are scaled down on load.
+function tame(vrm, emissiveK = .22, colorK = .74) {
+  vrm.scene.traverse((o) => { o.frustumCulled = false; const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    ms.forEach((m) => { if (m.userData.tamed) return; m.userData.tamed = true;
+      if (typeof m.emissiveIntensity === 'number') m.emissiveIntensity = Math.min(1.1, m.emissiveIntensity * emissiveK * (m.isMToonMaterial ? 1 : 1.6));
+      if (m.isMToonMaterial && m.color) m.color.multiplyScalar(colorK); }); });
+}
+let ash = null, settled = false, mc = null, mcSettled = false;
+const mcTune = { upX: -1.2, upZ: -.5, lowY: -2.1, lowZ: 0 };                             // mic arm, tuned by eye
+new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/mcspark.vrm', (gltf) => {
+  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); tame(vrm); scene.add(vrm.scene); mc = vrm; window.club.mc = vrm;
+}, undefined, (e) => console.error('mc model failed to load', e));
+function poseMC(bar, sec, pulse, dt) {
+  if (!mc) return;
+  const b = (n) => mc.humanoid.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
+  const out = Math.min(1, Math.max(0, (bar - 11.2) / 1.6)), ease = out * out * (3 - 2 * out);          // steps aside as the set starts
+  mc.scene.position.set(-1.3 - 1.75 * ease, 0, 1.7 - .55 * ease); mc.scene.rotation.y = .28 + .5 * ease;
+  const talking = name === 'announce' && ((bar < 4.3) || (bar > 5 && bar < 9.6));                       // his two lines
+  const sway = Math.sin(beat * Math.PI / 2), hype = talking ? 1 : energy;
+  if (b('hips')) b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * hype) * pulse;
+  b('spine')?.rotation.set(.04, sway * .12 * (.4 + hype), sway * .05);
+  b('head')?.rotation.set(talking ? -.08 + .06 * Math.sin(beat * Math.PI * 2) : .05 * pulse, sway * .14, 0);
+  // right arm: mic at the mouth while he talks, down by his side after; left arm: pumping the air
+  const mic = talking ? 1 : 0, pump = talking ? .75 + .25 * Math.sin(beat * Math.PI) : (energy > .65 ? .7 + .3 * Math.sin(beat * Math.PI) : 0);
+  b('rightUpperArm')?.rotation.set(mcTune.upX * mic + tune.upperX * (1 - mic), 0, -(tune.upperZ * (1 - mic)) + mcTune.upZ * mic);
+  b('rightLowerArm')?.rotation.set(0, -(tune.lowerY * (1 - mic) * .3 + mcTune.lowY * mic), 0);
+  b('leftUpperArm')?.rotation.set(tune.upperX * (1 - pump) * .3, 0, tune.upperZ * (1 - pump) + tune.raise * pump);
+  b('leftLowerArm')?.rotation.set(0, tune.lowerY * .25 * (1 - pump), 0);
+  mc.expressionManager?.setValue('aa', talking ? .35 + .35 * Math.abs(Math.sin(beat * Math.PI * 3.3)) : 0);  // mouth moves while he speaks
+  if (!mcSettled) { mc.springBoneManager?.reset(); mcSettled = true; }
+  mc.update(dt);
+}
+const tune = { raise: 2.2, upperZ: -1.12, upperX: .35, lowerY: 1.25, lowerZ: .0, hand: .2 };       // arm pose, tuned by eye on this model
+new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/lime.vrm', (gltf) => {
+  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm); tame(vrm);
   vrm.scene.position.set(0, 0, -.05); scene.add(vrm.scene); ash = vrm; window.club.vrm = vrm;
 }, undefined, (e) => console.error('ashley model failed to load', e));
 function poseAsh(bar, sec, pulse, dt) {
@@ -308,7 +383,7 @@ function poseAsh(bar, sec, pulse, dt) {
   b('head').rotation.set(.02 + .07 * pulse * energy, sway * .1, 0);
   for (const side of ['left', 'right']) {
     const s = side === 'left' ? 1 : -1, up = side === 'right' ? handsUp : handsUp * .0;
-    b(side + 'UpperArm').rotation.set(tune.upperX * (1 - up), 0, s * (tune.upperZ * (1 - up) + 1.25 * up));
+    b(side + 'UpperArm').rotation.set(tune.upperX * (1 - up), 0, s * (tune.upperZ * (1 - up) + tune.raise * up));
     b(side + 'LowerArm').rotation.set(0, s * tune.lowerY * (1 - up * .7), s * tune.lowerZ);
     b(side + 'Hand').rotation.set(0, 0, s * tune.hand + (side === 'left' ? Math.sin(beat * Math.PI) * .12 : 0));
   }
@@ -323,11 +398,12 @@ const SHOTS = [
   { p: [-2.7, 1.85, 2.3], t: [-1.9, 1.62, .35] },     // 2 Claudio on the left stack
   { p: [3.7, 1.9, 2.4], t: [0, 1.2, -.6] },          // 3 side, booth and crowd
   { p: [0, 3.1, 4.0], t: [0, 1.25, -1.2] },           // 4 high, the whole room
-  { p: [1.6, 1.36, 1.95], t: [1.05, 1.2, .8] },      // 5 little Claudio on the mixer
+  { p: [1.6, 1.36, 1.95], t: [1.05, 1.2, .8] },
+  { p: [-.75, 1.5, 3.9], t: [-1.3, 1.36, 1.7] },      // 6 the announcer      // 5 little Claudio on the mixer
 ];
 function shotAt(bar, sec) {
   const [start, name, energy] = sec;
-  if (name === 'announce') return bar < 6 ? 0 : (bar < 9 ? 4 : 1);
+  if (name === 'announce') return bar < 2.5 ? 0 : (bar < 4.4 ? 6 : (bar < 5.2 ? 4 : (bar < 9.6 ? 6 : 0)));
   if (name === 'introA') return 0;
   const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
   const order = energy >= .9 ? [0, 1, 3, 2, 4, 1, 5, 3] : [1, 0, 2, 3, 0, 5, 4, 1];
@@ -364,18 +440,24 @@ function frame(bar, dt) {
       c.vrm.update(dt);
     }
   });
-  poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt);
+  poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt); poseMC(bar, sec, pulse, dt);
   spots.forEach((s, i) => {
-    s.intensity = (9 + 22 * energy) * (.55 + .45 * pulse) * (name === 'introA' ? .3 : 1);
+    s.intensity = (5 + 9 * energy) * (.55 + .45 * pulse) * (name === 'introA' ? .3 : 1);
     const a = bar * (.5 + i * .13) + i * 1.7; s.target.position.set(Math.sin(a) * 4.2, .8, -2.6 + Math.cos(a * .7) * 2.2); s.target.updateMatrixWorld();
   });
-  wash.intensity = 3.5 + 9 * energy * (.4 + .6 * pulse); wash.color.setHex(Math.floor(bar / 4) % 2 ? CYAN : PINK);
+  wash.intensity = 2 + 4 * energy * (.4 + .6 * pulse); wash.color.setHex(Math.floor(bar / 4) % 2 ? CYAN : PINK);
   const drop = (name === 'drop' || name === 'final') && bar - start < 2;                 // strobe through the first 2 bars of a drop
   const rollHit = build > .5 ? ((beat * (build > .75 ? 4 : 2)) % 1 < .25 ? 1 : 0) * (build - .5) * 2 : 0;
-  strobe.intensity = drop ? ((beat * 4) % 1 < .35 ? 16 : 0) : rollHit * 7;
-  key.intensity = 11 + 5 * energy;
+  strobe.intensity = drop ? ((beat * 4) % 1 < .35 ? 9 : 0) : rollHit * 4;
+  key.intensity = 3.2 + 1 * energy;
+  signs.forEach(({ m, l, i }) => {                       // a slow breathing glow, a kick of brightness on the beat, a rare flicker
+    const flick = rand(Math.floor(bar * 16) + i * 77) > .985 ? .35 : 1, g = (.82 + .18 * Math.sin(bar * 1.3 + i * 1.7)) * (.85 + .25 * pulse * energy) * flick;
+    m.material.opacity = Math.min(1, g); l.intensity = (2.5 + 3 * energy) * g;
+  });
+  boothSign.material.opacity = .85 + .15 * pulse;
+  glows.forEach(({ l, k, bar: b, c }, i) => { const g = .6 + .4 * Math.sin(bar * .9 + i * 1.3) + .5 * pulse * energy; l.intensity = k * g; b.material.color.setHex(c).multiplyScalar(.5 + .5 * Math.min(1, g)); });
   tubes.forEach((t, i) => t.material.color.setHex(i % 2 ? CYAN : PINK).multiplyScalar(.55 + .45 * pulse));
-  bloom.strength = .3 + .25 * energy + .12 * pulse + (drop ? .15 : 0);
+  bloom.strength = .28 + .14 * energy + .08 * pulse + (drop ? .1 : 0);
   poseCamera(bar, sec, pulse);
   composer.render();
 }
@@ -385,7 +467,7 @@ const ed = document.getElementById('ed'), params = new URLSearchParams(location.
 let sched = null, fake = params.has('bar') ? { bar0: +params.get('bar'), t0: performance.now(), hold: params.has('hold') } : null;
 const barNow = () => sched ? sched.now() % BARS : fake ? (fake.hold ? fake.bar0 : (fake.bar0 + (performance.now() - fake.t0) / 1000 * (126 / 240)) % BARS) : 0;
 window.club = { render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
-  resettle: () => { settled = false; }, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
+  resettle: () => { settled = false; mcSettled = false; }, mcTune, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
 if (fake) document.getElementById('go').remove();
 document.getElementById('start')?.addEventListener('click', async () => {
   const btn = document.getElementById('start'); btn.textContent = 'LOADING…';

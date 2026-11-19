@@ -113,3 +113,12 @@ RSI: ~12 min, 1 look-fix round -> no loss worth fixing.
 Joona: "this logo on all the peoples tshirt" (a pink starburst). Drawn in code (12 rounded rays) as one chest decal per dancer; checked by screenshot, no console errors. Open before anything public: the starburst is Claude's mark and belongs to Anthropic, like Claudio's look.
 
 RSI: ~4 min, 0 re-work -> no loss worth fixing.
+
+## ITER-015 (2026-11-19): neon, Lime as the DJ, MC Spark as the announcer
+- Joona: neon signs, "Claude loves art", colours, glow, light from below, and "LoveSpark". Tube lettering is drawn in code (halo, glow, white core) on additive planes; each sign carries a point light, signs breathe, kick on the beat and flicker now and then; five underglow lights under the booth, stacks and podiums.
+- Joona: "It's the lime character that I want" and "mcspark the announcer". Both VRMs come from ashley-pc (`vtuber/lime/v4`, `vtuber/mcspark/v2`; local `models/`, not in the repo). Lime replaces the older Ashley model at the decks. MC Spark stands out front with the mic at his mouth during his two lines (mouth moving), one arm in the air, then walks to the side as the set starts; the intro cuts to him for each line.
+- Their models are self-lit (emissive hair, LEDs, headphones), which washed them out white under club lights: `tame()` scales emissive and base colour on load. Key light, spots, wash, strobe and bloom all came down to make room for the neon.
+- Raised arms pointed sideways: "up" needed about 2.2 rad from the T-pose, not 1.25; the mic arm was tuned by eye over three tries.
+Checked by screenshot at bars 1, 3, 61, 64 and 66, and live with audio: no console errors. Not yet checked: MC Spark's walk-off at bars 12-13, 16:9 framing, a full run.
+
+RSI: ~25 min, 4 look-fix rounds -> top loss: arm rotations found by trial (3 rounds) -> fix: `tune` and `mcTune` are exposed on `window.club`, so a pose is tuned live in one round next time.
