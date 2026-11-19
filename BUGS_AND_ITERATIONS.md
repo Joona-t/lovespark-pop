@@ -87,3 +87,9 @@ RSI: ~30 min, 1 re-launch -> top loss: BUG-008, found only because sample load l
 Joona's new second line: "I don't know about you, but I'm ASI pilled, baby! Shout outs to Anthropic and Claude for making this all happen!" Six takes, all word-perfect by speech recognition (ASI written as spelled letters); the take with the held "baaaby" from the same seed as line 1 is used. Intro is now 12 bars (crowd re-enters at bar 7, roll 16/16/24/32 on bars 9-12), set on bar 13; 132 bars, about 4:11. Verified on the playing pattern after a stitched launch: new file loaded, no errors.
 
 RSI: ~8 min, 0 re-work -> no loss worth fixing (one generation, one check, one launch).
+
+## ITER-011 (2026-11-19): club set video, live Three.js preview
+`tools/club/index.html`, served at `/club`: a Three.js stage whose every frame is a pure function of the set's bar position (the Strudel scheduler's clock), so lights, bounces and cuts land on the music with no keyframing. Ash's VRM at the decks, three code-built Claudios, 54 dancers behind the booth, glyph LED wall, six camera angles cut on bar lines. Brief and scene list: `video/club-set/brief.md`. Models are local only (`models/`, git-ignored).
+Checked by screenshot at bars 2, 63, 64, 66 and live with audio: no console errors, set playing, scene in the right section. Found and fixed on the way: lights 5x too bright (three r160 uses physical units), the hidden editor leaking text, Ash's arm rotations inverted, hair physics exploding from the T-pose (spring bones now reset after the first posed frame). Not yet checked: 16:9 framing, phone width, a full run through all 132 bars, frame rate with the pane visible (the hidden pane throttles to 1 fps).
+
+RSI: ~35 min, 5 look-fix rounds -> top loss: screenshots lagged the requested bar in the throttled pane, hiding what a change did -> fix: `club.render(bar, n)` renders the exact bar on demand; it is also the hook for the final frame render.

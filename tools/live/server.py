@@ -54,6 +54,26 @@ def main():
                         time.sleep(0.25)
                 except (BrokenPipeError, ConnectionResetError):
                     return
+            elif self.path.split("?")[0].rstrip("/") == "/club" or self.path.startswith(("/club/", "/patterns/", "/models/")):
+                # the club stage page, the pattern files it plays, and local character models
+                rel = self.path.split("?")[0].lstrip("/")
+                if rel.rstrip("/") == "club":
+                    rel = "tools/club/index.html"
+                elif rel.startswith("club/"):
+                    rel = "tools/" + rel
+                f = (ROOT / rel).resolve()
+                types = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary"}
+                allowed = any(d in f.parents for d in ((ROOT / "tools" / "club").resolve(), (ROOT / "patterns").resolve(), (ROOT / "models").resolve()))
+                if allowed and f.is_file() and f.suffix in types:
+                    body = f.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type", types[f.suffix])
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self.send_error(404)
             elif self.path.startswith("/samples/"):
                 # our own sample packs, served to the page only (same origin)
                 f = (ROOT / self.path.lstrip("/").split("?")[0]).resolve()

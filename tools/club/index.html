@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyber Space Club</title>
+<script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.0/lib/three-vrm.module.js"
+} }
+</script>
+<style>
+  html, body { margin:0; height:100%; background:#05030a; overflow:hidden; }
+  canvas#stage { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  #ed { position:fixed; left:0; top:0; width:600px; height:300px; opacity:0; pointer-events:none; z-index:-1; }
+  canvas#stage { z-index:1; }
+  #go { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(5,3,10,.72); z-index:5; }
+  #go button { font:700 20px ui-monospace, Menlo, monospace; letter-spacing:.08em; color:#140a10; background:#ff4fb0; border:0;
+    border-radius:8px; padding:16px 28px; cursor:pointer; box-shadow:0 0 28px rgba(255,79,176,.6); }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="go"><button id="start">START THE SET</button></div>
+<strudel-editor id="ed"><!--
+// loading
+--></strudel-editor>
+
+<script type="module">
+// The club: a Three.js stage driven by the set's own clock (bars), so every light, bounce and cut lands on the music.
+// ?bar=60 previews a position without audio (also the hook for rendering frames later: window.club.setBar(x)).
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+const TRACK = '/patterns/10-cyber-space-set.strudel.js', BARS = 132;
+// [first bar, name, energy 0..1, kick: 0 none / 1 four-on-the-floor / 2 half-time]
+const SECTIONS = [
+  [0, 'announce', .55, 0], [12, 'introA', .2, 0], [20, 'introB', .3, 0], [28, 'build', .55, 1], [36, 'A', .7, 1],
+  [52, 'break', .35, 0], [60, 'drop', 1, 1], [76, 'B', .75, 1], [92, 'bridge', .45, 2], [100, 'final', 1, 1],
+  [116, 'outroA', .5, 1], [124, 'outroB', .2, 0]];
+const sectionAt = (bar) => { let s = SECTIONS[0]; for (const x of SECTIONS) if (bar >= x[0]) s = x; return s; };
+const PINK = 0xff4fb0, CYAN = 0x3ef0ff, ORANGE = 0xe8622c;
+const rand = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };   // fixed per index
+
+// ---------- renderer ----------
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05030a); scene.fog = new THREE.Fog(0x05030a, 6, 16);
+const camera = new THREE.PerspectiveCamera(38, 1, .1, 60);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .45, .88); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+// ---------- room ----------
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x0b0714, roughness: .35, metalness: .6 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+// back wall screen: the glyph grid from the live page, as a texture
+const gc = document.createElement('canvas'); gc.width = 768; gc.height = 320; const gx = gc.getContext('2d');
+const gtex = new THREE.CanvasTexture(gc); gtex.colorSpace = THREE.SRGBColorSpace;
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(12, 5), new THREE.MeshBasicMaterial({ map: gtex }));
+screen.position.set(0, 2.9, -6.5); scene.add(screen);
+const GLYPHS = '.:-=+*#%@░▒▓█▚▞◢◣◤◥アカサタナハマヤラワ01';
+function drawGlyphs(bar, pulse, energy) {
+  const W = gc.width, H = gc.height, CELL = 16, s = bar * 1.9;
+  const g = gx.createLinearGradient(0, 0, W, H); const hue = 300 + 40 * Math.sin(s * .07);
+  g.addColorStop(0, `hsl(${hue},85%,${8 + 10 * pulse * energy}%)`); g.addColorStop(1, `hsl(190,90%,${7 + 8 * pulse * energy}%)`);
+  gx.fillStyle = g; gx.fillRect(0, 0, W, H);
+  gx.font = `${CELL - 3}px ui-monospace, Menlo, monospace`; gx.textBaseline = 'top';
+  const rows = H / CELL, cols = W / CELL, scan = (bar % 1) * rows;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const n = Math.sin(x * .31 + s * .9) + Math.cos(y * .27 - s * .7) + Math.sin((x + y) * .11 + s * .3);
+    const v = (n + 3) / 6, near = Math.max(0, 1 - Math.abs(y - scan) / 3);
+    const a = .06 + (.3 + .5 * energy) * v * v + .5 * near * pulse;
+    if (a < .1) continue;
+    gx.fillStyle = (x + y) % 7 === 0 ? `rgba(62,240,255,${a})` : `rgba(255,79,176,${a})`;
+    gx.fillText(GLYPHS[Math.floor(v * (GLYPHS.length - 1) + s * 2 + x) % GLYPHS.length], x * CELL, y * CELL);
+  }
+  gtex.needsUpdate = true;
+}
+// neon tubes
+const tube = (color, x, y, z, len, rotZ = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(len, .05, .05), new THREE.MeshBasicMaterial({ color })); m.position.set(x, y, z); m.rotation.z = rotZ; scene.add(m); return m; };
+const tubes = [tube(PINK, -6.2, 2.6, -3, 5, Math.PI / 2), tube(CYAN, 6.2, 2.6, -3, 5, Math.PI / 2), tube(PINK, 0, 5.5, -6.3, 12), tube(CYAN, 0, .25, -6.3, 12)];
+
+// ---------- the booth ----------
+const dark = new THREE.MeshStandardMaterial({ color: 0x15101f, roughness: .5, metalness: .4 });
+const booth = new THREE.Group(); scene.add(booth); booth.position.set(0, 0, .75);
+const table = new THREE.Mesh(new THREE.BoxGeometry(2.6, .98, .75), dark); table.position.y = .49; booth.add(table);
+const front = new THREE.Mesh(new THREE.PlaneGeometry(2.5, .8), new THREE.MeshBasicMaterial({ map: gtex })); front.position.set(0, .47, .378); booth.add(front);   // LED front panel
+const strip = new THREE.Mesh(new THREE.BoxGeometry(2.6, .04, .02), new THREE.MeshBasicMaterial({ color: PINK })); strip.position.set(0, .93, .385); booth.add(strip);
+const platters = [];
+for (const x of [-.72, .72]) {
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(.62, .06, .5), new THREE.MeshStandardMaterial({ color: 0x221a30, roughness: .4, metalness: .6 })); deck.position.set(x, 1.01, 0); booth.add(deck);
+  const pl = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .03, 40), new THREE.MeshStandardMaterial({ color: 0x08060c, roughness: .25, metalness: .8 })); pl.position.set(x, 1.055, 0); booth.add(pl);
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(.18, .005, .02), new THREE.MeshBasicMaterial({ color: CYAN })); mark.position.set(.09, .02, 0); pl.add(mark); platters.push(pl);
+}
+const mixer = new THREE.Mesh(new THREE.BoxGeometry(.42, .07, .5), new THREE.MeshStandardMaterial({ color: 0x2a2038, roughness: .4, metalness: .5 })); mixer.position.set(0, 1.015, 0); booth.add(mixer);
+const leds = [];
+for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.025, .012, .025), new THREE.MeshBasicMaterial({ color: i > 6 ? PINK : CYAN })); l.position.set(-.15 + (i % 2) * .3, 1.056, -.2 + Math.floor(i / 2) * .09); booth.add(l); leds.push(l); }
+// speaker stacks, a Claudio on each
+const stacks = [];
+for (const x of [-1.9, 1.9]) {
+  const st = new THREE.Group(); st.position.set(x, 0, .35); scene.add(st); stacks.push(st);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(.8, 1.3, .7), dark); box.position.y = .65; st.add(box);
+  for (const [y, r] of [[.38, .26], [.95, .17]]) { const cone = new THREE.Mesh(new THREE.CylinderGeometry(r, r * .7, .06, 32), new THREE.MeshStandardMaterial({ color: 0x050308, roughness: .3, metalness: .7 })); cone.rotation.x = Math.PI / 2; cone.position.set(0, y, .36); st.add(cone); st.userData['cone' + r] = cone; }
+}
+
+// ---------- Claudio (built from his master sheet: fuzzy orange, stepped pixel body, two stub arms, six legs, pixel arch eyes, no mouth) ----------
+function makeClaudio() {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body); g.userData.body = body;
+  const fur = new THREE.MeshStandardMaterial({ color: ORANGE, roughness: 1, emissive: 0x3a1206, emissiveIntensity: .55 });
+  const black = new THREE.MeshBasicMaterial({ color: 0x050505 });
+  const add = (w, h, d, x, y, z, m = fur) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); body.add(b); return b; };
+  add(1.5, .95, .9, 0, .72, 0);                      // core, flat top
+  add(1.74, .55, .82, 0, .66, 0);                    // stepped shoulders
+  add(1.24, .12, .8, 0, 1.25, 0);                    // stepped top edge
+  g.userData.arms = [add(.24, .26, .5, -.98, .68, 0), add(.24, .26, .5, .98, .68, 0)];
+  g.userData.legs = [-.62, -.4, -.18, .18, .4, .62].map(x => add(.17, .3, .5, x, .13, 0));
+  for (const ex of [-.36, .36]) {                    // happy closed eyes: one block on top, two lower at the sides
+    add(.15, .075, .03, ex, .93, .455, black); add(.075, .075, .03, ex - .11, .855, .455, black); add(.075, .075, .03, ex + .11, .855, .455, black);
+  }
+  return g;
+}
+const claudios = [];
+for (const [x, y, z, sc, ry] of [[-1.9, 1.3, .35, .44, .25], [1.9, 1.3, .35, .44, -.25], [1.08, 1.05, .8, .2, -.3]]) {
+  const c = makeClaudio(); c.position.set(x, y, z); c.scale.setScalar(sc); c.rotation.y = ry; c.userData.baseY = y; c.userData.sc = sc; scene.add(c); claudios.push(c);
+}
+
+// ---------- crowd (behind the DJ, the Boiler Room way) ----------
+const N = 54, dummy = new THREE.Object3D();
+const crowdMat = new THREE.MeshStandardMaterial({ roughness: .8, metalness: .1 });
+const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.19, .62, 4, 10), crowdMat, N);
+const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(.13, 14, 12), crowdMat, N);
+const arms = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.05, .5, 3, 8), crowdMat, N * 2);
+const phones = new THREE.InstancedMesh(new THREE.BoxGeometry(.08, .15, .01), new THREE.MeshBasicMaterial({ color: 0xcfe8ff }), N);
+const people = [];
+const SHIRTS = [0x2b2140, 0x1c2a44, 0x3a1d3a, 0x14323a, 0x40222c, 0x26263a, 0x4a2f1a];
+for (let i = 0; i < N; i++) {
+  const row = Math.floor(i / 9), col = i % 9;
+  const p = { x: (col - 4) * .92 + (rand(i) - .5) * .5 + (row % 2) * .4, z: -1.25 - row * .78 - rand(i + 50) * .3, h: .9 + rand(i + 9) * .22,
+    ph: rand(i + 3) * 6.28, lively: .5 + rand(i + 7) * .5, phone: rand(i + 21) > .82, lean: (rand(i + 5) - .5) * .25 };
+  people.push(p);
+  const col3 = new THREE.Color(SHIRTS[Math.floor(rand(i + 11) * SHIRTS.length)]);
+  bodies.setColorAt(i, col3); heads.setColorAt(i, new THREE.Color().setHSL(.07 + rand(i + 13) * .04, .35, .32 + rand(i + 17) * .2));
+  arms.setColorAt(i * 2, col3); arms.setColorAt(i * 2 + 1, col3);
+}
+scene.add(bodies, heads, arms, phones);
+function poseCrowd(bar, sec, pulse) {
+  const [, name, energy] = sec, beat = bar * 4, cheer = name === 'announce' ? 1 : 0;
+  for (let i = 0; i < N; i++) {
+    const p = people[i], up = Math.abs(Math.sin(beat * Math.PI + p.ph * .25));          // one bounce per beat
+    const jump = (.03 + .16 * energy * p.lively + .1 * cheer * p.lively) * up;
+    const sway = Math.sin(beat * Math.PI / 2 + p.ph) * .06;
+    const y = p.h * .62 + jump;
+    dummy.position.set(p.x + sway, y, p.z); dummy.rotation.set(0, 0, p.lean * .4 + sway * .8); dummy.scale.set(1, p.h, 1); dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(p.x + sway * 1.5, y + p.h * .62, p.z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
+    // arms: down at low energy, pumping in the air when it kicks off; each person has their own threshold
+    const wants = Math.min(1, Math.max(0, (energy + cheer * .5 + .25 * Math.sin(bar * .8 + p.ph) - (1 - p.lively) * .9) * 2.2));
+    for (const side of [-1, 1]) {
+      const raise = wants * (side === 1 || p.lively > .7 ? 1 : .25), pump = raise * pulse * .12;
+      const ang = side * (.25 + (1 - raise) * .1) - side * raise * .05;                 // tilt from vertical
+      const ay = y + p.h * .28 + raise * (.5 + pump) - (1 - raise) * .12;
+      dummy.position.set(p.x + sway + side * (.24 + (1 - raise) * .03), ay, p.z + raise * .05); dummy.rotation.set(raise * -.15, 0, ang); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+      arms.setMatrixAt(i * 2 + (side === 1 ? 1 : 0), dummy.matrix);
+    }
+    const showPhone = p.phone && (energy > .6 || cheer);
+    dummy.position.set(p.x + sway + .26, showPhone ? y + p.h * .28 + .86 : -5, p.z + .08); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); phones.setMatrixAt(i, dummy.matrix);
+  }
+  bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = arms.instanceMatrix.needsUpdate = phones.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- lights ----------
+scene.add(new THREE.AmbientLight(0x5a4a86, 1.35));
+const key = new THREE.SpotLight(0xffe2d0, 14, 12, .42, .7, 1.2); key.position.set(.6, 3.6, 4.2); key.target.position.set(0, 1.3, 0); scene.add(key, key.target);
+const spots = [[PINK, -4.5], [CYAN, 4.5], [PINK, 2], [CYAN, -2]].map(([c, x]) => { const s = new THREE.SpotLight(c, 0, 16, .42, .7, 1); s.position.set(x, 5.2, -1.5); scene.add(s, s.target); return s; });
+const wash = new THREE.PointLight(PINK, 0, 14, 1.4); wash.position.set(0, 3.2, -3.4); scene.add(wash);
+const strobe = new THREE.PointLight(0xffffff, 0, 20, 1); strobe.position.set(0, 4.5, 1); scene.add(strobe);
+
+// ---------- Ashley ----------
+let ash = null, settled = false;
+const tune = { upperZ: -1.12, upperX: .35, lowerY: 1.25, lowerZ: .0, hand: .2 };       // arm pose, tuned by eye on this model
+new GLTFLoader().register((p) => new VRMLoaderPlugin(p)).load('/models/ashley.vrm', (gltf) => {
+  const vrm = gltf.userData.vrm; VRMUtils.rotateVRM0(vrm);
+  vrm.scene.traverse((o) => { o.frustumCulled = false; });
+  vrm.scene.position.set(0, 0, -.05); scene.add(vrm.scene); ash = vrm; window.club.vrm = vrm;
+}, undefined, (e) => console.error('ashley model failed to load', e));
+function poseAsh(bar, sec, pulse, dt) {
+  if (!ash) return;
+  const h = ash.humanoid, b = (n) => h.getNormalizedBoneNode(n), [, name, energy] = sec, beat = bar * 4;
+  const sway = Math.sin(beat * Math.PI / 2), handsUp = (name === 'drop' || name === 'final') && (Math.floor(bar) % 4 === 3) ? 1 : (name === 'announce' ? .75 + .25 * Math.sin(beat * Math.PI) : 0);
+  b('hips').position.y = (b('hips').userData.y0 ??= b('hips').position.y) - (.012 + .03 * energy) * pulse;
+  b('spine').rotation.set(.06 + .04 * pulse * energy, sway * .07 * (.4 + energy), sway * .035);
+  b('chest').rotation.set(.03, sway * .05, 0);
+  b('neck').rotation.set(.05 + .11 * pulse * (.4 + energy), 0, sway * .03);
+  b('head').rotation.set(.02 + .07 * pulse * energy, sway * .1, 0);
+  for (const side of ['left', 'right']) {
+    const s = side === 'left' ? 1 : -1, up = side === 'right' ? handsUp : handsUp * .0;
+    b(side + 'UpperArm').rotation.set(tune.upperX * (1 - up), 0, s * (tune.upperZ * (1 - up) + 1.25 * up));
+    b(side + 'LowerArm').rotation.set(0, s * tune.lowerY * (1 - up * .7), s * tune.lowerZ);
+    b(side + 'Hand').rotation.set(0, 0, s * tune.hand + (side === 'left' ? Math.sin(beat * Math.PI) * .12 : 0));
+  }
+  if (!settled) { ash.springBoneManager?.reset(); settled = true; }   // hair starts from the posed body, not the T-pose
+  ash.update(dt);
+}
+
+// ---------- camera: a few fixed angles, cut on bar lines, slight handheld drift ----------
+const SHOTS = [
+  { p: [0, 1.5, 4.4], t: [0, 1.42, 0] },            // 0 wide, front of the decks
+  { p: [.55, 1.5, 2.55], t: [0, 1.36, 0] },          // 1 Ash close
+  { p: [-2.6, 1.75, 2.1], t: [-1.9, 1.5, .35] },     // 2 Claudio on the left stack
+  { p: [3.7, 1.9, 2.4], t: [0, 1.2, -.6] },          // 3 side, booth and crowd
+  { p: [0, 3.1, 4.0], t: [0, 1.25, -1.2] },           // 4 high, the whole room
+  { p: [1.55, 1.34, 1.95], t: [1.0, 1.16, .8] },      // 5 little Claudio on the mixer
+];
+function shotAt(bar, sec) {
+  const [start, name, energy] = sec;
+  if (name === 'announce') return bar < 6 ? 0 : (bar < 9 ? 4 : 1);
+  if (name === 'introA') return 0;
+  const len = energy >= .7 ? 4 : 8, k = Math.floor((bar - start) / len);
+  const order = energy >= .9 ? [0, 1, 3, 2, 4, 1, 5, 3] : [1, 0, 2, 3, 0, 5, 4, 1];
+  return order[(k + start) % order.length];
+}
+const tmpT = new THREE.Vector3();
+function poseCamera(bar, sec, pulse) {
+  const sh = SHOTS[shotAt(bar, sec)], t = bar * 1.9, e = sec[2];
+  camera.position.set(sh.p[0] + Math.sin(t * .31) * .05, sh.p[1] + Math.sin(t * .47) * .03 + pulse * .012 * e, sh.p[2] + Math.cos(t * .23) * .06 - (bar % 4) * .03);
+  tmpT.set(sh.t[0] + Math.sin(t * .19) * .02, sh.t[1], sh.t[2]); camera.lookAt(tmpT);
+}
+
+// ---------- one frame, as a pure function of the bar position ----------
+function frame(bar, dt) {
+  const sec = sectionAt(bar), [start, name, energy, kick] = sec, beat = bar * 4;
+  const ph = kick === 2 ? (beat / 2) % 1 : beat % 1, pulse = kick ? Math.exp(-ph * 5.5) : .25 * Math.exp(-(beat % 1) * 3) * energy;
+  const build = name === 'break' || name === 'bridge' ? (bar - start) / 8 : 0;           // 0..1 through a build-up
+  drawGlyphs(bar, pulse, energy + build * .5);
+  platters.forEach((p, i) => { p.rotation.y = -bar * Math.PI * 2 * 1.11 * (i ? 1 : .98); });
+  leds.forEach((l, i) => { l.visible = (i / 10) < (.25 + pulse * .8 * (.4 + energy)); });
+  stacks.forEach((s) => { s.userData['cone0.26'].position.z = .36 + pulse * .035 * energy; s.userData['cone0.17'].position.z = .36 + pulse * .015; });
+  claudios.forEach((c, i) => {                       // squash on the kick, pop up after it, tiny hop turns in the drops
+    const hop = Math.abs(Math.sin(beat * Math.PI + i * .4)) * (.05 + .22 * energy) * c.userData.sc * 2.2;
+    const sq = 1 - .16 * pulse * (.4 + energy);
+    c.userData.body.scale.set(1 + (1 - sq) * .6, sq, 1 + (1 - sq) * .6); c.position.y = c.userData.baseY + hop;
+    c.userData.arms.forEach((a, k) => { a.rotation.x = Math.sin(beat * Math.PI + k * Math.PI) * .9 * (.3 + energy); });
+    c.userData.legs.forEach((l, k) => { l.position.y = .13 + Math.max(0, Math.sin(beat * Math.PI * 2 + k * 1.1)) * .05 * energy; });
+    c.rotation.z = Math.sin(beat * Math.PI / 2 + i) * .06 * (.3 + energy);
+  });
+  poseCrowd(bar, sec, pulse); poseAsh(bar, sec, pulse, dt);
+  spots.forEach((s, i) => {
+    s.intensity = (9 + 22 * energy) * (.55 + .45 * pulse) * (name === 'introA' ? .3 : 1);
+    const a = bar * (.5 + i * .13) + i * 1.7; s.target.position.set(Math.sin(a) * 4.2, .8, -2.6 + Math.cos(a * .7) * 2.2); s.target.updateMatrixWorld();
+  });
+  wash.intensity = 3.5 + 9 * energy * (.4 + .6 * pulse); wash.color.setHex(Math.floor(bar / 4) % 2 ? CYAN : PINK);
+  const drop = (name === 'drop' || name === 'final') && bar - start < 2;                 // strobe through the first 2 bars of a drop
+  const rollHit = build > .5 ? ((beat * (build > .75 ? 4 : 2)) % 1 < .25 ? 1 : 0) * (build - .5) * 2 : 0;
+  strobe.intensity = drop ? ((beat * 4) % 1 < .35 ? 16 : 0) : rollHit * 7;
+  key.intensity = 11 + 5 * energy;
+  tubes.forEach((t, i) => t.material.color.setHex(i % 2 ? CYAN : PINK).multiplyScalar(.55 + .45 * pulse));
+  bloom.strength = .3 + .25 * energy + .12 * pulse + (drop ? .15 : 0);
+  poseCamera(bar, sec, pulse);
+  composer.render();
+}
+
+// ---------- the clock: the set's own scheduler, or a free-running preview clock ----------
+const ed = document.getElementById('ed'), params = new URLSearchParams(location.search);
+let sched = null, fake = params.has('bar') ? { bar0: +params.get('bar'), t0: performance.now(), hold: params.has('hold') } : null;
+const barNow = () => sched ? sched.now() % BARS : fake ? (fake.hold ? fake.bar0 : (fake.bar0 + (performance.now() - fake.t0) / 1000 * (126 / 240)) % BARS) : 0;
+window.club = { render: (bar, n = 1) => { for (let i = 0; i < n; i++) frame(bar, 1 / 60); },
+  resettle: () => { settled = false; }, setBar: (x) => { fake = { bar0: x, t0: performance.now(), hold: true }; sched = null; }, barNow, sectionAt, tune, SHOTS, vrm: null, frames: 0 };
+if (fake) document.getElementById('go').remove();
+document.getElementById('start')?.addEventListener('click', async () => {
+  const btn = document.getElementById('start'); btn.textContent = 'LOADING…';
+  const code = await (await fetch(TRACK)).text();
+  await Promise.all(['mc/mc1__s42.wav', 'mc/mc2c__s42.wav', 'mc/crowd.wav'].map((f) => fetch('/samples/' + f).then((r) => r.arrayBuffer()).catch(() => 0)));
+  const m = ed.editor; m.setCode(code); await m.evaluate();
+  sched = m.repl.scheduler; fake = null; document.getElementById('go').remove();
+});
+let last = performance.now();
+(function loop(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(barNow(), dt); window.club.frames++; requestAnimationFrame(loop); })(last);
+</script>
+</body>
+</html>
