@@ -344,3 +344,12 @@ Joona, on ITER-033: the grass row looked like a bar code, "too much empty space"
 - Looked at: bars 3.5, 20, 40, 60, 78, 90, 100, 126, 146 at 1280 x 720 in the pane. Not done: the video render; `check_layout.mjs` has not been run from the shell (no Playwright in this checkout; the same function ran in the pane).
 
 RSI: ~30 min, 3 looks -> top loss: ITER-033 shipped scene crossfades and free-placed plants with nothing measuring overlap -> fix: lanes by construction plus viz.check(), which failed on a real overlap before it passed.
+
+## ITER-035 (2026-11-20): Slow Light video rendered; cover and release folder for Bvby Ash
+Joona: "Render the video", then "make it [the cover] from one of the still shots from the visualizer. You're choosing. And the artist name will be Bvby Ash ... put this under the Baby Ash one".
+- **Video:** `tools/viz/render_viz.mjs`, two halves at once in headless Chrome on the MacBook (4,318 frames each, 214 s for the slower half, about 20 frames a second each), joined and muxed with the master: `renders/slow-light-video.mp4`, 1920 x 1080, 30 fps, 8,633 frames, 4:47.8, H.264 + AAC 320k. Looked at a contact sheet of frames 90, 1500, 4318, 4319 (the join), 5600, 7400, 8300, 8620: title, growth, full bloom, dispersal, blank paper; the two frames at the join match. `check_layout.mjs` from the shell: clean.
+- **Cover:** `?scale=2.7778&cover` draws the glyph atlas at 3000 px high (sharp, not upscaled) with the five middle lanes only; bar 126 (full bloom, the sun open), middle square cropped: `slow-light-cover.png/.jpg`, 3000 x 3000, no text. `tools/viz/still.mjs` makes any still.
+- **Release folder** `~/Downloads/Baby Ash project/Slow Light/`: DistroKid WAV (16-bit 44.1 kHz, triangular dither, -14.2 LUFS, -1.4 dBFS peak, 287.8 s), 24-bit 48 kHz master, MP3, cover JPG + PNG, video.
+- **DistroKid upload not done.** Computer use can only read a browser window (no clicks or typing), the Claude in Chrome extension is not connected in this session, and the app's own Browser pane is signed out of DistroKid. Waiting on Joona for one of: connect the extension, sign in to DistroKid in the pane, or upload by hand.
+
+RSI: ~20 min, 1 failed ffmpeg call (soxr not in this build; the fallback after a pipe never ran) -> top loss: none worth a check -> none.

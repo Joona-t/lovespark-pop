@@ -32,7 +32,9 @@ const BPM = 128, BARS = 152, TAIL = 1.5;
 const C = 480, R = 180, CW = 4, CH = 6;                               // grid and cell size in px (1920 x 1080)
 const PAPER = '#E8DDC8', INK = '#0E0805';                             // glyph-grid-studio's cream-paper palette
 const GROUND = 900, SUN_X = 960, SUN_Y = 310, LANE = 172;
-const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+const QS = new URLSearchParams(location.search), K = clamp_(+QS.get('scale') || 1), COVER = QS.has('cover');   // ?scale=2.7778 draws the glyphs sharp at 3000 px high; ?cover keeps the five middle lanes (a square crop)
+function clamp_(v) { return v < 1 ? 1 : v > 4 ? 4 : v; }
+const cv = document.getElementById('cv'); cv.width = Math.round(1920 * K); cv.height = Math.round(1080 * K); const cx = cv.getContext('2d');
 const big = document.createElement('canvas'); big.width = C * 2; big.height = R * 2; const p = big.getContext('2d');           // the painting
 const small = document.createElement('canvas'); small.width = C; small.height = R; const sm = small.getContext('2d', { willReadFrequently: true });
 
@@ -140,17 +142,17 @@ function paint(b, s) {
   title(ease((b - .4) / 1.6) * (1 - ease((b - 5.5) / 2.5)));
   // the ground: one line
   const gl = ease(b / 3);
-  p.beginPath(); p.moveTo(960 - 920 * gl, GROUND); p.lineTo(960 + 920 * gl, GROUND); p.strokeStyle = ink(.85); p.lineWidth = 4; p.stroke();
-  for (let i = 0; i < PLANTS.length; i++) plant(i, b, s);
+  p.beginPath(); p.moveTo(960 - (COVER ? 480 : 920) * gl, GROUND); p.lineTo(960 + (COVER ? 480 : 920) * gl, GROUND); p.strokeStyle = ink(.85); p.lineWidth = 4; p.stroke();
+  for (let i = COVER ? 3 : 0; i < (COVER ? 8 : PLANTS.length); i++) plant(i, b, s);
   // the melody: each note rings from the flower whose lane matches its pitch (low notes left, high notes right)
-  for (const [age, m] of s.notes) { const i = clamp(Math.round((m - 64) / 16 * 10), 0, 10), [H, t0] = PLANTS[i], f = 1 - age / .75;
+  for (const [age, m] of COVER ? [] : s.notes) { const i = clamp(Math.round((m - 64) / 16 * 10), 0, 10), [H, t0] = PLANTS[i], f = 1 - age / .75;
     p.save(); p.setLineDash([4, 12]); p.beginPath(); p.arc(SUN_X + (i - 5) * LANE, GROUND - H * growth(b, t0), 74 + age * 26, 0, TAU); p.strokeStyle = ink(.8 * f); p.lineWidth = 3.5; p.stroke(); p.restore(); }
 }
 
 // ---------- ink: every cell becomes one glyph; density and opacity follow the painting ----------
 const LEVELS = ['.,', ':;', "'`", '+*', '<>/', '{}()', '01o', 'xea', 'wm8', 'B#%@'];       // light to dark, code glyphs throughout
 const atlas = document.createElement('canvas'), GL = [];
-{ LEVELS.forEach((set) => [...set].forEach((ch) => GL.push(ch))); atlas.width = GL.length * 10; atlas.height = 12; const a = atlas.getContext('2d');
+{ LEVELS.forEach((set) => [...set].forEach((ch) => GL.push(ch))); atlas.width = Math.ceil(GL.length * 10 * K); atlas.height = Math.ceil(12 * K); const a = atlas.getContext('2d'); a.scale(K, K);
   a.font = '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace'; a.textBaseline = 'middle'; a.textAlign = 'center'; a.fillStyle = INK; GL.forEach((ch, i) => a.fillText(ch, i * 10 + 5, 6)); }
 const LSTART = []; { let n = 0; LEVELS.forEach((set) => { LSTART.push(n); n += set.length; }); }
 const paper = document.createElement('canvas'); paper.width = 1920; paper.height = 1080;
@@ -161,7 +163,7 @@ const paper = document.createElement('canvas'); paper.width = 1920; paper.height
 function frame(b) {
   const s = song(b); paint(b, s);
   sm.drawImage(big, 0, 0, C, R); const d = sm.getImageData(0, 0, C, R).data;
-  cx.globalAlpha = 1; cx.drawImage(paper, 0, 0);
+  cx.setTransform(K, 0, 0, K, 0, 0); cx.globalAlpha = 1; cx.drawImage(paper, 0, 0);
   const beatN = Math.floor(b * 4), disp = clamp((b - 139) / 12.5), fadeOut = 1 - ease((b - 151) / 1.5);
   for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
     let v = d[(y * C + x) * 4] / 255; if (v < .07) continue;
@@ -172,7 +174,7 @@ function frame(b) {
     if (disp > 0) { const h1 = hash(x, y, 91), h2 = hash(x, y, 92), ph = clamp((disp - .3 * h1) / .7); if (ph > 0) {      // stardust: the ink lifts off the paper (glyph-grid-studio's dispersal)
         px += (h2 - .5) * 2 * .3 * 430 * ph + Math.sin(b * 2 + h1 * TAU) * 9 * ph; py -= ph * 430 * (.4 + .6 * h2); al *= Math.pow(1 - ph, 1.6); } }
     if (al < .02) continue;
-    cx.globalAlpha = al; cx.drawImage(atlas, gi * 10, 0, 10, 12, px, py, 10, 12);
+    cx.globalAlpha = al; cx.drawImage(atlas, gi * 10 * K, 0, 10 * K, 12 * K, px, py, 10, 12);
   }
   cx.globalAlpha = 1;
 }
