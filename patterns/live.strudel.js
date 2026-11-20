@@ -3,7 +3,7 @@
 // the pluck opens over 32 bars instead of a riser, micro-automation every few bars, every phrase resolves G6 -> Am9.
 // Sections: intro 16 · journey 32 · breakdown 16 · drop 24 · outro 8
 // @q 4
-// @top
+// @keep
 setcpm(128/4)
 
 const prog = "<Am9 Fmaj9 C^7 G6>", roots = "<a1 f1 c2 g1>"
@@ -19,14 +19,24 @@ const clap = s("~ cp ~ cp").bank("RolandTR909").hpf(300).room(.3).gain(.45)
 const hats = s("[~ hh]*4").bank("RolandTR909").hpf(5000).gain(.38)
 const ride = s("rd*4").bank("RolandTR909").hpf(6000).gain(.16)
 
-// the mau5 pluck: chord stab, 3-3-2 syncopation, filter envelope snaps shut, dotted-eighth delay.
-// lo..hi is where the cutoff starts and ends; bars is how slowly it opens.
-const pluck = (lo, hi, bars) => chord(prog).voicing()
-  .struct("x ~ ~ x ~ ~ x ~ ~ x ~ ~ x ~ x ~").s("sawtooth").detune(.2)
-  .hpf(220).lpf(saw.range(lo, hi).slow(bars)).lpenv(3).lpdecay(.14).lpsustain(0).lpq(6)
-  .decay(.22).sustain(0).delay(.3).delaytime(3/16).delayfeedback(.4)
-  .room(saw.range(.25, .45).slow(bars)).pan(sine.range(.42, .58).slow(16))
-  .gain(.42).orbit(2)
+// the mau5 pluck, custom patch: three oscillators through one resonant filter envelope
+//   A  detuned saw stack (the body)      B  square an octave up (the glassy top)
+//   C  FM sine, short metallic blip on the attack (the "tick" that cuts through)
+// shared: 4-stage-ish snap (lpenv 4, 120 ms decay, q 9), tiny pitch dip on the attack, slow vibrato drift like an old analog
+// 3-3-2 syncopation, dotted-eighth delay. lo..hi is where the cutoff starts and ends; bars is how slowly it opens.
+const stab = "x ~ ~ x ~ ~ x ~ ~ x ~ ~ x ~ x ~"
+const pluckVoice = (osc) => chord(prog).voicing().struct(stab).layer(osc)
+const pluck = (lo, hi, bars) => stack(
+    pluckVoice(x => x.s("supersaw").unison(3).detune(.18).gain(.4)),
+    pluckVoice(x => x.add(note(12)).s("square").gain(.12)),
+    pluckVoice(x => x.add(note(12)).s("sine").fm(3).fmh(3.01).fmdecay(.05).fmsustain(0).gain(.08)),
+  )
+  .hpf(220).lpf(saw.range(lo, hi).slow(bars)).lpattack(.002).lpenv(4).lpdecay(.12).lpsustain(0).lpq(9)
+  .penv(-.3).pdecay(.03).vib(4.5).vibmod(.05).shape(.12)
+  .attack(.002).decay(.24).sustain(0).release(.05)
+  .delay(.3).delaytime(3/16).delayfeedback(.4)
+  .room(saw.range(.25, .45).slow(bars)).pan(sine.range(.4, .6).slow(16))
+  .gain(1).orbit(2)
 
 // Kaskade warmth: one wide pad, enters late, quiet
 const pad = chord(prog).voicing().s("supersaw").detune(.45).unison(5)
