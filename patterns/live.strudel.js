@@ -1,56 +1,86 @@
-// 11 "Night Shift" · deadmau5 x kaskade progressive house, 128 BPM, A minor, 96 bars (~3:00)
-// Cooked live 2026-11-20. Mau5 rules: few layers at full fidelity, low end owned by kick + bass only,
-// the pluck opens over 32 bars instead of a riser, micro-automation every few bars, every phrase resolves G6 -> Am9.
-// Sections: intro 16 · journey 32 · breakdown 16 · drop 24 · outro 8
+// 11 "Slow Light" · deadmau5-style progressive house, 128 BPM, F# minor, 152 bars (~4:45)
+// Cooked live 2026-11-20 with Joona (chords and synth first, then drums, bass, then the arrangement).
+// The idea: one pluck, one set of chords, and patience. The filter is the story: it opens for four minutes.
+// No risers, no snare rolls. A melody arrives in the breakdown as a bell and returns at the drop as a lead.
+// Sections: intro 16 · groove 16 · build 16 · breakdown 24 · drop 32 · lift (B chords) 16 · return 16 · outro 16
 // @q 4
-// @keep
+// @top
 setcpm(128/4)
 
-const prog = "<Am9 Fmaj9 C^7 G6>", roots = "<a1 f1 c2 g1>"
+// ---- harmony: drawn like a piano roll, top notes barely move ----
+// A: F#m9 (2 bars) · Dmaj9 (2) · Amaj9 (2) · Esus4 -> E      roots F# D A E
+const chA = note(`<[fs3,a3,cs4,e4,gs4]!2 [d3,fs3,a3,cs4,e4]!2 [e3,gs3,b3,cs4,e4]!2 [e3,a3,b3,e4] [e3,gs3,b3,e4]>`)
+const rtA = note("<fs1!2 d2!2 a1!2 e1!2>")
+// B (the lift): Bm9 · Dmaj9 · F#m9 · Esus4 -> E; the top voice climbs C# -> E -> G#      roots B D F# E
+const chB = note(`<[d3,fs3,a3,cs4]!2 [d3,fs3,a3,cs4,e4]!2 [fs3,a3,cs4,e4,gs4]!2 [e3,a3,b3,e4] [e3,gs3,b3,e4]>`)
+const rtB = note("<b1!2 d2!2 fs1!2 e1!2>")
+// the melody: 8 bars, 3-3-2 phrasing, ends A -> G# as the sus4 resolves
+const tune = note(`<
+  [cs5 ~ ~ b4 ~ ~ a4 ~] [gs4 ~ ~ ~ ~ ~ e4 ~]
+  [fs4 ~ ~ a4 ~ ~ cs5 ~] [e5 ~ ~ ~ cs5 ~ ~ ~]
+  [b4 ~ ~ cs5 ~ ~ e5 ~] [gs5 ~ ~ ~ e5 ~ ~ ~]
+  [a4 ~ ~ b4 ~ ~ cs5 ~] [b4 ~ ~ ~ gs4 ~ ~ ~]>`)
 
-// low end: kick and bass only below 180 Hz; the kick ducks the music bus (orbit 2)
+// ---- the mau5 pluck: two detuned saws, resonant ladder low-pass, envelope snaps shut on every 16th ----
+// lo..hi: cutoff at the start and end of the section; bars: section length; dec: how long each note rings
+const pluck = (ch, lo, hi, bars, dec = .19) => ch.struct("x*16")
+  .s("sawtooth").unison(2).detune(.14)
+  .lpf(saw.range(lo, hi).slow(bars)).lpq(7).ftype("ladder")
+  .lpattack(.001).lpenv(3.5).lpdecay(.11).lpsustain(0)
+  .attack(.001).decay(dec).sustain(0).release(.04)
+  .gain("[.5 .28 .38 .28]*4")
+  .delay(.28).delaytime(3/16).delayfeedback(sine.range(.36, .48).slow(16))
+  .room(.35).size(.7).pan(sine.range(.42, .58).slow(12)).orbit(2)
+
+// pad: the same chords held, soft and wide
+const pad = (ch) => ch.s("supersaw").unison(5).detune(.4).attack(.9).release(2)
+  .hpf(260).lpf(sine.range(1100, 1700).slow(16)).room(.8).size(.9).gain(.13).orbit(2)
+
+// the melody as a bell (breakdown) and as a lead (drop)
+const bell = tune.s("sine").fm(1.6).fmh(2).fmdecay(.25).fmsustain(0)
+  .attack(.003).decay(.6).sustain(.1).release(.8)
+  .delay(.4).delaytime(3/8).delayfeedback(.5).room(.7).size(.9).gain(.3).orbit(4)
+const lead = stack(tune.s("sawtooth").gain(.2), tune.sub(note(12)).s("square").gain(.1))
+  .hpf(300).lpf(2600).lpq(3).lpenv(2).lpdecay(.3).vib(5).vibmod(.06)
+  .attack(.005).decay(.3).sustain(.5).release(.2)
+  .delay(.3).delaytime(3/16).delayfeedback(.4).room(.45).orbit(2)
+
+// ---- low end: kick and bass only below 200 Hz; the kick ducks the music and the bass ----
 const kick = s("bd*4").bank("RolandTR909").shape(.15).gain(1)
-  .orbit(9).duckorbit(2).duckattack(.25).duckdepth(.85)
-const bass = note(roots).struct("[~ x]*4").s("sawtooth")
-  .lpf(420).lpq(3).decay(.22).sustain(.15).release(.04).gain(.62).orbit(2)
+  .orbit(9).duckorbit("2:3").duckattack(.22).duckdepth(.8)
+const bass = (rt) => stack(
+    rt.struct("~ x ~ x ~ x ~ [x x]").s("sine").decay(.25).sustain(.6).release(.05).gain(.7),
+    rt.struct("~ x ~ x ~ x ~ [x x]").add(note(12)).s("sawtooth").lpf(520).lpq(4).lpenv(2).lpdecay(.1)
+      .decay(.2).sustain(.1).release(.04).gain(.32),
+  ).orbit(3)
+const sub = (rt) => rt.s("sine").attack(.05).release(.3).gain(.5).orbit(3)   // held roots, breakdown only
 
-// tops, high-passed out of the low end
+// ---- tops ----
 const clap = s("~ cp ~ cp").bank("RolandTR909").hpf(300).room(.3).gain(.45)
-const hats = s("[~ hh]*4").bank("RolandTR909").hpf(5000).gain(.38)
-const ride = s("rd*4").bank("RolandTR909").hpf(6000).gain(.16)
-
-// the mau5 pluck, custom patch: three oscillators through one resonant filter envelope
-//   A  detuned saw stack (the body)      B  square an octave up (the glassy top)
-//   C  FM sine, short metallic blip on the attack (the "tick" that cuts through)
-// shared: 4-stage-ish snap (lpenv 4, 120 ms decay, q 9), tiny pitch dip on the attack, slow vibrato drift like an old analog
-// 3-3-2 syncopation, dotted-eighth delay. lo..hi is where the cutoff starts and ends; bars is how slowly it opens.
-const stab = "x ~ ~ x ~ ~ x ~ ~ x ~ ~ x ~ x ~"
-const pluckVoice = (osc) => chord(prog).voicing().struct(stab).layer(osc)
-const pluck = (lo, hi, bars) => stack(
-    pluckVoice(x => x.s("supersaw").unison(3).detune(.18).gain(.4)),
-    pluckVoice(x => x.add(note(12)).s("square").gain(.12)),
-    pluckVoice(x => x.add(note(12)).s("sine").fm(3).fmh(3.01).fmdecay(.05).fmsustain(0).gain(.08)),
-  )
-  .hpf(220).lpf(saw.range(lo, hi).slow(bars)).lpattack(.002).lpenv(4).lpdecay(.12).lpsustain(0).lpq(9)
-  .penv(-.3).pdecay(.03).vib(4.5).vibmod(.05).shape(.12)
-  .attack(.002).decay(.24).sustain(0).release(.05)
-  .delay(.3).delaytime(3/16).delayfeedback(.4)
-  .room(saw.range(.25, .45).slow(bars)).pan(sine.range(.4, .6).slow(16))
-  .gain(1).orbit(2)
-
-// Kaskade warmth: one wide pad, enters late, quiet
-const pad = chord(prog).voicing().s("supersaw").detune(.45).unison(5)
-  .attack(.6).release(1.8).hpf(250).lpf(1500).room(.8).size(.9).gain(.15).orbit(2)
-
-// top line for the drop in A minor, lands on the root every 4 bars
-const lead = n("<[4 ~ 2 ~ 4 ~ 7 ~] [6 ~ 4 ~ 2 ~ ~ ~] [4 ~ 2 ~ 4 ~ 9 7] [~ 6 4 2 0 ~ ~ ~]>")
-  .scale("A3:minor").s("square").hpf(400).lpf(2600).lpenv(2).lpdecay(.2)
-  .decay(.25).sustain(.25).release(.15).delay(.3).delaytime(3/16).room(.5).gain(.22).orbit(2)
+const hats = s("[~ hh]*4").bank("RolandTR909").hpf(5000).gain(.36)
+const ticks = s("hh*16").bank("RolandTR909").hpf(8000).gain("[.05 .1 .07 .13]*4")
+const open = s("[~ oh]*4").bank("RolandTR909").hpf(4000).gain(.2)
+const ride = s("rd*4").bank("RolandTR909").hpf(6000).gain(.14)
+const crash = s("<cr ~!7>").bank("RolandTR909").hpf(3000).room(.6).gain(.25)
 
 arrange(
-  [16, stack(kick, hats.gain(.25), pluck(300, 700, 16))],
-  [32, stack(kick, bass, clap, hats, pluck(700, 2600, 32))],
-  [16, stack(pluck(900, 1800, 16).delayfeedback(.55), pad.gain(.22), hats.gain(.15))],
-  [24, stack(kick, bass, clap, hats, ride, pluck(2600, 3400, 24), pad, lead)],
-  [8,  stack(kick, hats, pluck(2000, 400, 8))],
+  // intro: the pluck alone, nearly closed
+  [8,  pluck(chA, 320, 480, 8)],
+  [8,  stack(pluck(chA, 480, 650, 8), kick, ticks)],
+  // groove: the bass names the chords
+  [16, stack(pluck(chA, 650, 1300, 16), kick, hats, ticks, bass(rtA))],
+  // build: only the filter builds
+  [16, stack(pluck(chA, 1300, 2400, 16), kick, clap, hats, ticks, bass(rtA))],
+  // breakdown: drums out, pad and the bell melody; the pluck sinks, then opens for 8 bars
+  [16, stack(pluck(chA, 1500, 700, 16, .3).gain(.3), pad(chA), bell)],
+  [8,  stack(pluck(chA, 700, 3200, 8, .26), pad(chA), bell, sub(rtA), ticks.gain(saw.range(.03, .16).slow(8)))],
+  // drop: everything, the melody on the lead
+  [32, stack(pluck(chA, 3200, 3800, 32, .23), kick, clap, hats, open, ticks, ride, crash, bass(rtA), pad(chA), lead)],
+  // lift: B chords, melody rests, the top voice of the chords climbs instead
+  [16, stack(pluck(chB, 2600, 4200, 16, .25), kick, clap, hats, open, ticks, crash, bass(rtB), pad(chB))],
+  // return: home chords, bell and lead together
+  [16, stack(pluck(chA, 4200, 3400, 16, .23), kick, clap, hats, open, ticks, ride, crash, bass(rtA), pad(chA), lead, bell.gain(.18))],
+  // outro: strip back to where it began
+  [8,  stack(pluck(chA, 3400, 1200, 8), kick, hats, ticks, bass(rtA))],
+  [8,  stack(pluck(chA, 1200, 320, 8), kick.mask("<1!4 0!4>"), ticks.mask("<1!6 0!2>"))],
 )

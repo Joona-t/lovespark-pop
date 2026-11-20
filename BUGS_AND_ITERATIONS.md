@@ -304,3 +304,13 @@ RSI: ~20 min, 4 live pushes -> top loss: none heard yet (verification is event c
 Joona: "synth needs to be customized more but this is decent". The single detuned saw became a patch: A a 3-voice supersaw body, B a square an octave up (glassy top), C an FM sine an octave up with a 50 ms FM decay (the attack tick), all through one resonant filter envelope (lpenv 4, 2 ms attack, 120 ms decay, q 9), with a small pitch dip on the attack (penv -0.3, 30 ms), slow vibrato drift (4.5 Hz, 0.05) and light saturation (shape 0.12). Pushed with `@keep` so the arrangement didn't restart; checked on the scheduler: all three layers fire in all five sections, parameters arrive on the events.
 
 RSI: ~10 min, 1 push -> top loss: still verified by events, not by ear -> fix: Joona's listen; render a WAV for an A/B against the old pluck if he wants it.
+
+## ITER-031 (2026-11-20): track 11 restarted as "Slow Light"
+Joona: "Scrap it completely. Let's start again. Deadmau chords and synth is important", then after hearing chords, drums and bass arrive one stage at a time: "I give you full creative vision. Bring your vision to life". Night Shift (ITER-029, ITER-030) is deleted. Slow Light: 128 BPM, F# minor, 152 bars (~4:45): intro 16, groove 16, build 16, breakdown 24, drop 32, lift 16 (B chords), return 16, outro 16.
+- **Chords** written note by note (not from `chord().voicing()`): F#m9, Dmaj9, Amaj9, Esus4 -> E, top notes held across changes; B section Bm9, Dmaj9, F#m9, Esus4 -> E with the top voice climbing.
+- **Synth:** one pluck (two detuned saws, resonant ladder low-pass, 110 ms filter envelope) on steady 16ths; its cutoff is the arrangement: 320 Hz at bar 1, 4200 Hz at the peak, 320 Hz at the end. No risers or snare rolls.
+- **Melody:** 8 bars in 3-3-2 phrasing, an FM bell in the breakdown, a saw + square lead in the drop, both in the return.
+- **Low end:** only kick and sine-sub bass below 200 Hz; kick ducks the music and bass buses.
+- Checked on the scheduler: no eval error; layers present in all 11 arrangement rows; cutoff at the first and last bar of each row matches the plan (e.g. row 1 320-479, drop 3200-3799, last row 1200-327).
+
+RSI: ~35 min, 5 live pushes, 0 eval errors -> top loss: the first attempt (Night Shift) was built from a generic chord chart and a stacked patch before Joona had judged the chords and synth alone -> fix: every new track starts with chords + main synth solo and waits for his ears before any other layer (done from the restart on).
