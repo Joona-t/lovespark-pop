@@ -353,3 +353,13 @@ Joona: "Render the video", then "make it [the cover] from one of the still shots
 - **DistroKid upload not done.** Computer use can only read a browser window (no clicks or typing), the Claude in Chrome extension is not connected in this session, and the app's own Browser pane is signed out of DistroKid. Waiting on Joona for one of: connect the extension, sign in to DistroKid in the pane, or upload by hand.
 
 RSI: ~20 min, 1 failed ffmpeg call (soxr not in this build; the fallback after a pipe never ran) -> top loss: none worth a check -> none.
+
+## ITER-036 (2026-11-20): Slow Light balance v2
+Joona, after listening on headphones and against other house tracks: "kick in the beginning overpowers and perhaps melody should be louder". (His first note, "the kick is too heavy ... same with high hats", he withdrew after the headphone listen, so the hats are unchanged.)
+- Kick: 1.0 everywhere became .4 in the intro, .5 in the groove, .6 in the build and .68 from the drop on. Pluck accents .5/.28/.38/.28 became .7/.4/.54/.4; bell .3 -> .44; lead .2/.1 -> .3/.15.
+- Stems, v1 -> v2 (peak dBFS): kick 0.0 -> -2.6, music -7.6 -> -5.4, bell -15.1 -> -11.9, drums and bass unchanged; RMS kick -13.0 -> -16.4, music -26.3 -> -24.0. Kick-to-music RMS gap 13.3 dB -> 7.6 dB.
+- Master v2: -14.1 LUFS, -1.4 dBTP, LRA 7.6 (was 11.9), null test -34.6 dB, four kicks in every bar of 9-48 and 73-148. Spectrum file re-made from it and the video re-rendered (8,633 frames).
+- v1 was already submitted to DistroKid by Joona before v2 existed; v2 sits beside it in the release folder (`3 - VERSION 2 ...`) and the submitted files are untouched. Replacing a live song's audio needs DistroKid's Ultimate plan (as the upload form states) or a takedown and re-upload: his call.
+- The live sum still peaks over full scale (+1.7 dBFS); only the master is clean.
+
+RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the first note was withdrawn (~2 min) -> none: his ears decide, cheap to redo.
