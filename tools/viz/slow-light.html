@@ -14,21 +14,24 @@
 </style>
 </head>
 <body>
-<canvas id="cv" width="1920" height="1080" aria-label="Slow Light visualiser: flowers drawn in charcoal glyphs on cream paper, blooming with the music"></canvas>
+<canvas id="cv" width="1920" height="1080" aria-label="Slow Light visualiser: a garden drawn in charcoal glyphs on cream paper grows under a sun whose rays are the music's spectrum"></canvas>
 <button id="go">PLAY</button>
 <script>
 // Slow Light · the music video. Charcoal glyphs on cream paper, the glyph-grid-studio way: a scene is painted into a
-// small buffer (how much ink, 0..1), then every cell of a 320 x 135 grid becomes one glyph whose density and opacity
+// small buffer (how much ink, 0..1), then every cell of a 480 x 180 grid becomes one glyph whose density and opacity
 // follow the ink. Every frame is a pure function of the bar position (no state, no Math.random), so the live page and
-// a frame-by-frame video render show the same picture. The song's one idea drives it: the pluck's filter is the light,
-// and the light makes things bloom.
-//   intro      blank paper, the title, one stem grows with the pluck          groove   a garden of stems and leaves
-//   build      buds swell and begin to open                                   breakdown  one great flower opens, slowly
-//   drop       full bloom, rays of light, the melody thrown out as petals     lift     a blossoming branch (new chords, new flora)
-//   return     the garden in full flower, petals falling                      outro    stardust: the ink lifts off the paper
+// a frame-by-frame video render show the same picture.
+// ONE picture for the whole song, nothing cuts or crossfades:
+//   above   the sun: its rays are the spectrum of the master (bass at the bottom, treble at the top, 32 bands a side),
+//           so it opens as the pluck's filter opens and it beats with the kick
+//   below   a garden that only ever grows: eleven plants, each in its own lane (nothing overlaps), short under the sun
+//           and tall at the sides; roots grow down as the stems grow up; buds form in the build and open one by one;
+//           each melody note rings from the flower whose lane matches its pitch
+//   outro   stardust: the ink lifts off the paper (the studio's dispersal)
 const BPM = 128, BARS = 152, TAIL = 1.5;
-const C = 320, R = 135, CW = 6, CH = 8;                               // grid and cell size in px (1920 x 1080)
+const C = 480, R = 180, CW = 4, CH = 6;                               // grid and cell size in px (1920 x 1080)
 const PAPER = '#E8DDC8', INK = '#0E0805';                             // glyph-grid-studio's cream-paper palette
+const GROUND = 900, SUN_X = 960, SUN_Y = 310, LANE = 172;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 const big = document.createElement('canvas'); big.width = C * 2; big.height = R * 2; const p = big.getContext('2d');           // the painting
 const small = document.createElement('canvas'); small.width = C; small.height = R; const sm = small.getContext('2d', { willReadFrequently: true });
@@ -41,6 +44,7 @@ const TUNE = [[0, 0, 73], [0, 3, 71], [0, 6, 69], [1, 0, 68], [1, 6, 64], [2, 0,
 const within = (b, a, z) => b >= a && b < z, TAU = Math.PI * 2;
 const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
 const ease = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
+const lerp = (a, z, t) => a + (z - a) * t;
 const fr = (v) => v - Math.floor(v);
 function hash(a, b = 0, c = 0) { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 function light(b) {                                                   // 0..1: the pluck's cutoff on a log scale
@@ -50,111 +54,104 @@ function light(b) {                                                   // 0..1: t
 function song(b) {
   const beat = fr(b * 4), kickOn = within(b, 8, 48) || within(b, 72, 148);
   const s = { b, L: light(b), kick: kickOn ? Math.exp(-beat * 6) : 0,
-    hat: (within(b, 16, 48) || within(b, 72, 144)) ? Math.exp(-fr(b * 4 + .5) * 7) : 0,
     bass: (within(b, 16, 48) || within(b, 72, 144)) ? Math.exp(-fr(b * 4 + .5) * 4) : 0, root: Math.floor(b / 2) % 4,
     pluck: b < BARS ? [.5, .28, .38, .28][Math.floor(b * 16) % 4] * 2 * Math.exp(-fr(b * 16) * 2.5) : 0,
-    bell: within(b, 48, 72) || within(b, 120, 136), lead: within(b, 72, 104) || within(b, 120, 136), notes: [] };
-  if (s.bell || s.lead) { const loop = Math.floor(b / 8) * 8;                                  // melody notes sounding now: [age in bars, midi, index]
-    for (const base of [loop - 8, loop]) TUNE.forEach(([br, st, m], i) => { const t0 = base + br + st / 8, age = b - t0;
-      if (age >= 0 && age < 1.25 && (within(t0, 48, 104) || within(t0, 120, 136))) s.notes.push([age, m, i + base]); }); }
+    lead: within(b, 72, 104) || within(b, 120, 136), notes: [] };
+  if (within(b, 48, 105.5) || within(b, 120, 137.5)) { const loop = Math.floor(b / 8) * 8;      // melody notes sounding now: [age in bars, midi]
+    for (const base of [loop - 8, loop]) TUNE.forEach(([br, st, m]) => { const t0 = base + br + st / 8, age = b - t0;
+      if (age >= 0 && age < .75 && (within(t0, 48, 104) || within(t0, 120, 136))) s.notes.push([age, m]); }); }
   return s;
 }
+// the spectrum of the master (tools/viz/analyze.py): 32 bands, 30 frames a second
+let SPEC = null;
+function spectrum(b) { const out = new Float32Array(32); if (!SPEC) return out;
+  const f = clamp(b * 240 / BPM * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f), t = f - i;
+  for (let k = 0; k < 32; k++) out[k] = Math.pow(lerp(SPEC.d[i * 32 + k], SPEC.d[(i + 1) * 32 + k], t) / 255, 1.9);
+  return out; }
 
 // ---------- painting tools: everything is drawn in 1920 x 1080 coordinates, as an amount of ink 0..1 ----------
 const ink = (v) => { const g = clamp(v) * 255 | 0; return `rgb(${g},${g},${g})`; };
 function petal(x, y, ang, len, wid, base = .55, tip = .16, edge = .9) {       // a petal from (x,y) pointing along ang; shaded base -> tip, darker rim, one vein
-  if (len < 4) return;
+  if (len < 5) return;
   p.save(); p.translate(x, y); p.rotate(ang);
   p.beginPath(); p.moveTo(0, 0); p.bezierCurveTo(len * .3, -wid, len * .8, -wid * .9, len, 0); p.bezierCurveTo(len * .8, wid * .9, len * .3, wid, 0, 0);
-  const g = p.createLinearGradient(0, 0, len, 0); g.addColorStop(0, ink(base)); g.addColorStop(.75, ink(tip)); g.addColorStop(1, ink(tip + .12));
-  p.fillStyle = g; p.fill(); p.strokeStyle = ink(edge); p.lineWidth = 5; p.stroke();
-  p.beginPath(); p.moveTo(len * .08, 0); p.lineTo(len * .7, 0); p.strokeStyle = ink(base * .9); p.lineWidth = 4; p.stroke();
+  const g = p.createLinearGradient(0, 0, len, 0); g.addColorStop(0, ink(base)); g.addColorStop(.75, ink(tip)); g.addColorStop(1, ink(tip + .1));
+  p.fillStyle = g; p.fill(); p.strokeStyle = ink(edge); p.lineWidth = 3.5; p.stroke();
+  if (len > 30) { p.beginPath(); p.moveTo(len * .1, 0); p.lineTo(len * .68, 0); p.strokeStyle = ink(base * .85); p.lineWidth = 2.5; p.stroke(); }
   p.restore();
 }
-function disc(x, y, r, v) { p.beginPath(); p.arc(x, y, Math.max(r, 0), 0, TAU); p.fillStyle = ink(v); p.fill(); }
-// a flower seen from above: rings of petals unfolding from the heart, outer ring first
-function bloom(x, y, r, open, rot, seed, rings = 5) {
-  for (let k = 0; k < rings; k++) { const n = [13, 12, 10, 8, 6][k], o = ease(open * 1.7 - k * .17), len = r * [1, .8, .61, .43, .28][k] * (.12 + .88 * o);
-    for (let j = 0; j < n; j++) petal(x, y, rot + k * 2.4 + j * TAU / n + (hash(seed, k, j) - .5) * .12, len, len * (.17 + .15 * o), .62 - k * .04, .14 + k * .05); }
-  disc(x, y, r * .13, .95); for (let j = 0; j < 14; j++) { const a = j * 2.4 + rot; disc(x + Math.cos(a) * r * .085 * Math.sqrt(j / 3), y + Math.sin(a) * r * .085 * Math.sqrt(j / 3), 5, .35); }
+function disc(x, y, r, v) { if (r <= 0) return; p.beginPath(); p.arc(x, y, r, 0, TAU); p.fillStyle = ink(v); p.fill(); }
+// three kinds of flower head; r is the most any part reaches from (x,y), so a head never leaves its lane
+function head(type, x, y, up, r, open, rot, seed) {
+  if (type === 0) {                                                                         // seen from above: rings of petals unfolding from the heart
+    for (let k = 0; k < 3; k++) { const n = [11, 9, 6][k], o = ease(open * 1.5 - k * .22), len = r * [1, .72, .45][k] * (.2 + .8 * o);
+      for (let j = 0; j < n; j++) petal(x, y, rot + k * 2.4 + j * TAU / n + (hash(seed, k, j) - .5) * .1, len, len * (.2 + .16 * o), .6 - k * .05, .13 + k * .05); }
+    disc(x, y, r * .17, .95); }
+  else if (type === 1) { const n = 9, spread = .3 + open * 3.3;                             // seen from the side: a fan that opens
+    for (let j = 0; j < n; j++) petal(x, y, up + (j / (n - 1) - .5) * spread, r * (.55 + .45 * open), r * .17, .6, .16); disc(x, y, r * .15, .92); }
+  else { for (const d of [-1, 1, 0]) petal(x, y + r * .25, up + d * (.12 + open * .55), r * (d ? 1.05 : 1.2), r * (.3 + .1 * open), .62, d ? .2 : .13); }   // a cup: three large petals
 }
-// flower heads seen from the side, on a stem tip pointing along up
-function head(type, x, y, up, r, open) {
-  if (type === 0) { const n = 9, spread = .35 + open * 3.4; for (let j = 0; j < n; j++) petal(x, y, up + (j / (n - 1) - .5) * spread, r * (.5 + .5 * open), r * .17, .6, .18); disc(x, y, r * .15, .9); }
-  else if (type === 1) { for (const d of [-1, 1, 0]) petal(x, y, up + d * (.14 + open * .62), r * (d ? .95 : 1.05), r * (.3 + .1 * open), .62, d ? .22 : .14); }
-  else { const n = 6, l = r * (.18 + .7 * open); for (let j = 0; j < n; j++) petal(x, y - r * .1, up + j * TAU / n + .5, l, l * .46, .58, .16); disc(x, y - r * .1, r * .17, .92); }
+// eleven lanes, short under the sun and tall at the sides. [full height, first bar, head kind, head size, bar its flower opens]
+const PLANTS = [[730, 7, 1, 62, 60], [660, 10, 0, 64, 44], [600, 5, 2, 58, 66], [540, 9, 0, 66, 52], [275, 3, 1, 58, 38], [230, 1, 0, 62, 34],
+                [275, 6, 2, 56, 56], [540, 11, 1, 64, 48], [600, 4, 0, 64, 63], [660, 12, 2, 60, 41], [730, 8, 0, 66, 69]];
+const growth = (b, t0) => { const u = b - t0; if (u <= 0) return 0;                          // never stops: over half in the first 26 bars, slower through it, the rest by the end of the lift
+  return .55 * ease(u / 26) + .12 * ease((b - 48) / 24) + .23 * ease((b - 72) / 16) + .1 * ease((b - 104) / 16); };
+function plant(i, b, s) {
+  const [H, t0, type, hr, tOpen] = PLANTS[i], g = growth(b, t0); if (g <= 0) return;
+  const x0 = SUN_X + (i - 5) * LANE, h = H * g, sway = (5 + (i % 4 === s.root ? 7 * s.bass : 0)) * Math.sin(b * Math.PI / 4 + i * 1.7), bend = (hash(i, 9) - .5) * 26;
+  const P = (t) => [x0 + sway * t * t + bend * Math.sin(t * Math.PI), GROUND - h * t];
+  // roots: down as far as the stem is up, inside the lane
+  for (let k = 0; k < 3; k++) { const a = (k - 1) * .62 + (hash(i, k, 11) - .5) * .3, len = Math.min(170, 30 + h * .3) * (.7 + .3 * hash(i, k, 12));
+    p.beginPath(); p.moveTo(x0, GROUND + 3); for (let j = 1; j <= 10; j++) { const u = j / 10; p.lineTo(x0 + Math.sin(a) * len * u * .62 + Math.sin(u * 7 + i + k) * 6 * u, GROUND + 3 + Math.cos(a) * len * u); }
+    p.strokeStyle = ink(.5); p.lineWidth = 3; p.lineJoin = 'round'; p.stroke(); }
+  // stem
+  p.beginPath(); p.moveTo(...P(0)); for (let k = 1; k <= 28; k++) p.lineTo(...P(k / 28)); p.strokeStyle = ink(.82); p.lineWidth = 5; p.lineJoin = 'round'; p.stroke();
+  // leaves: one every 84 px of stem, alternating sides, none near the flower
+  const bud = ease((b - t0 - 14) / 4), nLeaves = Math.floor((H - hr - 70) / 84);
+  for (let k = 0; k < nLeaves; k++) { const at = 62 + k * 84; if (h < at + 12) break; const [lx, ly] = P(at / h), side = (k + i) % 2 ? 1 : -1, sz = ease((h - at - 12) / 70) * (46 + hash(i, k, 4) * 16);
+    petal(lx, ly, -Math.PI / 2 + side * (.95 + .12 * Math.sin(b * Math.PI / 4 + i + k)), sz, sz * .24, .66, .24); }
+  // the tip: a point that beats with the pluck, then a bud, then the flower
+  const [tx, ty] = P(1), [ux, uy] = P(.94), up = Math.atan2(ty - uy, tx - ux);
+  if (bud < 1) disc(tx, ty, 5 + 6 * s.pluck, .9);
+  if (bud > 0) head(type, tx, ty, up, hr * bud * (.62 + .38 * ease((b - tOpen) / 9)) * (1 + .04 * s.kick), ease((b - tOpen) / 9), b * .02 + i, i);
 }
-const STEMS = [[0, 560, 1, 110], [-270, 420, 6, 82], [255, 470, 9, 90], [-525, 360, 12, 70], [505, 395, 14, 76], [-770, 300, 17, 60], [745, 335, 19, 66], [-135, 255, 21, 52], [385, 285, 23, 56]];   // [x from centre, height, first bar, head size]
-function garden(b, s, alpha, openAll) {
-  if (alpha <= 0) return; p.save(); p.globalAlpha = alpha;
-  const gOn = ease((b - 8) / 2);                                                            // grass arrives with the kick
-  if (gOn > 0) for (let i = 0; i < 96; i++) { const x = 14 + i * 19.8 + hash(i, 1) * 14, h = (10 + hash(i, 2) * hash(i, 5) * 60) * gOn, lean = 7 * Math.sin(b * Math.PI + i * .37) + s.kick * 16 * (hash(i, 3) - .5);
-    p.beginPath(); p.moveTo(x, 952); p.quadraticCurveTo(x + lean * .3, 952 - h * .6, x + lean, 952 - h); p.strokeStyle = ink(.5); p.lineWidth = 5; p.stroke(); }
-  STEMS.forEach(([dx, hgt, t0, hr], i) => { const g = ease((b - t0) / 12); if (g <= 0) return;
-    const sway = (26 + (i % 4 === s.root ? 34 * s.bass : 0)) * Math.sin(b * Math.PI / 4 + i * 1.7), bend = (hash(i, 9) - .5) * 90, x0 = 960 + dx;
-    const P = (t) => [x0 + sway * t * t + bend * Math.sin(t * Math.PI), 952 - hgt * t];
-    p.beginPath(); p.moveTo(...P(0)); for (let k = 1; k <= 24; k++) p.lineTo(...P(g * k / 24)); p.strokeStyle = ink(.78); p.lineWidth = 7; p.lineJoin = 'round'; p.stroke();
-    [.24, .43, .6].forEach((t, k) => { if (g < t) return; const [lx, ly] = P(t), side = (k + i) % 2 ? 1 : -1, sz = ease((b - t0 - 12 * t - 1) / 5) * (64 + hash(i, k, 4) * 50);
-      petal(lx, ly, -Math.PI / 2 + side * (.75 + .25 * Math.sin(b * Math.PI / 4 + i + k)), sz, sz * .2, .66, .26); });
-    const [tx, ty] = P(g), [ux, uy] = P(Math.max(0, g - .06)), up = Math.atan2(ty - uy, tx - ux);
-    if (g < 1) disc(tx, ty, 6 + 9 * s.pluck, .9);                                            // the growing tip beats with the pluck
-    const bud = ease((b - t0 - 11) / 3); if (bud > 0) head(i % 3, tx, ty, up, hr * bud * (1 + .05 * s.kick), openAll ? 1 : ease((b - 33 - i * 1.2) / 15) * (.35 + .65 * s.L)); });
-  p.restore();
+const SUN_REACH = (L) => 70 + 68 * L;                                  // how far a full-scale ray reaches past the disc
+function sun(b, s) {
+  const sp = spectrum(b), L = s.L, r0 = 70 + 34 * L + 7 * s.kick, reach = SUN_REACH(L), on = ease(b / 2);
+  // rays: 32 bands down each side, bass at the bottom, treble at the top
+  for (let side = -1; side <= 1; side += 2) for (let k = 0; k < 32; k++) { const a = Math.PI / 2 + side * (k + .5) / 32 * Math.PI, len = 5 + sp[k] * reach, c = Math.cos(a), sn = Math.sin(a);
+    const g = p.createLinearGradient(SUN_X + c * (r0 + 12), SUN_Y + sn * (r0 + 12), SUN_X + c * (r0 + 12 + len), SUN_Y + sn * (r0 + 12 + len)); g.addColorStop(0, ink(.85 * on)); g.addColorStop(1, ink(.3 * on));
+    p.beginPath(); p.moveTo(SUN_X + c * (r0 + 12), SUN_Y + sn * (r0 + 12)); p.lineTo(SUN_X + c * (r0 + 12 + len), SUN_Y + sn * (r0 + 12 + len)); p.strokeStyle = g; p.lineWidth = 5.5; p.lineCap = 'butt'; p.stroke(); }
+  // the disc: a shaded ball, darker rim; a dotted halo at the furthest the rays can reach now
+  const g = p.createRadialGradient(SUN_X - r0 * .3, SUN_Y - r0 * .3, r0 * .1, SUN_X, SUN_Y, r0); g.addColorStop(0, ink(.1 * on)); g.addColorStop(.7, ink((.24 + .2 * L) * on)); g.addColorStop(1, ink(.6 * on));
+  p.beginPath(); p.arc(SUN_X, SUN_Y, r0, 0, TAU); p.fillStyle = g; p.fill(); p.strokeStyle = ink(.9 * on); p.lineWidth = 3.5; p.stroke();
+  p.save(); p.setLineDash([3, 15]); p.lineDashOffset = b * 6; p.beginPath(); p.arc(SUN_X, SUN_Y, r0 + 18 + reach, 0, TAU); p.strokeStyle = ink(.42 * on); p.lineWidth = 3.5; p.stroke(); p.restore();
 }
-function rays(x, y, r0, len, b, v) { p.save(); p.setLineDash([22, 16]); p.lineDashOffset = -b * 60; p.lineWidth = 5; p.strokeStyle = ink(v);
-  for (let i = 0; i < 48; i++) { const a = i * TAU / 48 + b * .012, l = len * (.55 + .45 * hash(i, 31)); p.beginPath(); p.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); p.lineTo(x + Math.cos(a) * (r0 + l), y + Math.sin(a) * (r0 + l)); p.stroke(); }
-  p.restore(); }
-function macro(b, s, alpha) {                                                               // the one great flower
-  if (alpha <= 0) return; p.save(); p.globalAlpha = alpha;
-  const x = 960, y = 525, r = 370 * (1 + .035 * s.kick), open = ease((b - 50) / 22), rot = b * .022;
-  const ray = ease((b - 64) / 8); if (ray > 0) rays(x, y, r * 1.06, 620 * s.L * ray, b, .3);
-  for (const [age, , i] of s.notes) { const f = 1 - age / 1.25;                              // each melody note: a ring of pollen, and in the drop a petal thrown out
-    p.save(); p.setLineDash([6, 24]); p.lineWidth = 7; p.strokeStyle = ink(.75 * f); p.beginPath(); p.arc(x, y, r * .2 + age * 560, 0, TAU); p.stroke(); p.restore();
-    if (s.lead) { const a = hash(i, 41) * TAU, d = r * .9 + age * 620; petal(x + Math.cos(a) * d, y + Math.sin(a) * d, a + age * 3, 70 * f + 20, 20, .6 * f + .1, .2 * f, .9 * f); } }
-  bloom(x, y, r, open, rot, 5);
-  p.restore();
-}
-function branch(b, s, alpha) {                                                              // the lift: a blossoming branch
-  if (alpha <= 0) return; p.save(); p.globalAlpha = alpha;
-  const g = ease((b - 103.5) / 3.5), B = (t) => { const u = 1 - t; return [u * u * u * -60 + 3 * u * u * t * 520 + 3 * u * t * t * 1250 + t * t * t * 1990, u * u * u * 800 + 3 * u * u * t * 820 + 3 * u * t * t * 380 + t * t * t * 330]; };
-  for (let k = 0; k < 60; k++) { const t = k / 60; if (t > g) break; p.beginPath(); p.moveTo(...B(t)); p.lineTo(...B(Math.min(g, t + 1 / 58))); p.strokeStyle = ink(.82); p.lineWidth = 30 - 20 * t; p.lineCap = 'round'; p.stroke(); }
-  const spots = [];
-  for (let k = 0; k < 9; k++) { const t = .08 + k * .105; if (t > g) break; const [x, y] = B(t), side = k % 2 ? 1 : -1, a = -Math.PI / 2 * side + (hash(k, 51) - .5) * 1.1 - .25, l = (120 + hash(k, 52) * 170) * ease((g - t) * 5);
-    p.beginPath(); p.moveTo(x, y); p.quadraticCurveTo(x + Math.cos(a) * l * .5 + 20, y + Math.sin(a) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l); p.strokeStyle = ink(.78); p.lineWidth = 9; p.stroke();
-    for (let j = 1; j <= 2; j++) spots.push([x + Math.cos(a) * l * j / 2 + (hash(k, j, 53) - .5) * 40, y + Math.sin(a) * l * j / 2 + (hash(k, j, 54) - .5) * 40, k * 4 + j]); spots.push([x + (hash(k, 55) - .5) * 60, y - 34 * side, k * 4]); }
-  spots.sort((a, z) => hash(a[2], 56) - hash(z[2], 56)).forEach(([x, y, id], n) => { const o = ease((b - 105.5 - n * .42) / 1.1); if (o <= 0) return;      // a blossom every beat or so
-    const r = (54 + hash(id, 57) * 30) * (o + .25 * Math.sin(o * Math.PI)) * (1 + .06 * s.kick);
-    for (let j = 0; j < 5; j++) petal(x, y, j * TAU / 5 + hash(id, 58) * 6, r, r * .52, .45, .1, .9); disc(x, y, r * .17, .95); });
-  p.restore();
-}
-function falling(b, alpha, n = 30) { if (alpha <= 0) return; p.save(); p.globalAlpha = alpha;
-  for (let i = 0; i < n; i++) { const x = hash(i, 61) * 1920 + 70 * Math.sin(b * .9 + i), y = fr((b * (.045 + .05 * hash(i, 62))) + hash(i, 63)) * 1180 - 50, sz = 24 + hash(i, 64) * 22;
-    petal(x, y, b * (1 + hash(i, 65)) + i, sz, sz * .42, .5, .16, .8); } p.restore(); }
 // title: 5x7 dot letters
 const FONT = { S: '01111100001000001110000010000111110', L: '10000100001000010000100001000011111', O: '01110100011000110001100011000101110',
   W: '10001100011000110101101011101110001', I: '11111001000010000100001000010011111', G: '01110100011000010111100011000101110',
   H: '10001100011000111111100011000110001', T: '11111001000010000100001000010000100', ' ': '0'.repeat(35) };
-function title(alpha) { if (alpha <= 0) return; const T = 'SLOW LIGHT', u = 16, x0 = 960 - (T.length * 6 - 1) * u / 2, y0 = 250; p.fillStyle = ink(.95 * alpha);
+function title(alpha) { if (alpha <= 0) return; const T = 'SLOW LIGHT', u = 13, x0 = SUN_X - (T.length * 6 - 1) * u / 2, y0 = 560; p.fillStyle = ink(.92 * alpha);
   [...T].forEach((ch, i) => { for (let k = 0; k < 35; k++) if (FONT[ch][k] === '1') p.fillRect(x0 + (i * 6 + k % 5) * u, y0 + Math.floor(k / 5) * u, u, u); }); }
 
 function paint(b, s) {
   p.setTransform(1, 0, 0, 1, 0, 0); p.globalAlpha = 1; p.fillStyle = '#000'; p.fillRect(0, 0, big.width, big.height); p.setTransform(big.width / 1920, 0, 0, big.height / 1080, 0, 0);
-  const wGarden = (1 - ease((b - 47) / 7)) + ease((b - 119) / 4), wMacro = ease((b - 48) / 7) * (1 - ease((b - 102) / 4)), wBranch = ease((b - 103) / 2.5) * (1 - ease((b - 119) / 4));
+  sun(b, s);
   title(ease((b - .4) / 1.6) * (1 - ease((b - 5.5) / 2.5)));
-  if (b >= 119) { p.save(); p.globalAlpha = wGarden * .9; p.setLineDash([26, 20]); p.lineDashOffset = -b * 50; p.lineWidth = 5; p.strokeStyle = ink(.2 + .1 * s.L);      // the return: light falling across the garden
-    for (let i = 0; i < 16; i++) { p.beginPath(); p.moveTo(-200 + i * 150, -20); p.lineTo(260 + i * 150, 960); p.stroke(); } p.restore(); }
-  garden(b, s, clamp(wGarden), b >= 119);
-  macro(b, s, wMacro); branch(b, s, wBranch);
-  falling(b, Math.max(wBranch, b >= 120 ? wGarden : 0) * .9);
-  const dust = s.hat * .5 + .25;                                                           // pollen in the air, twinkling with the hats
-  for (let i = 0; i < 70; i++) { const on = ease((b - 1 - hash(i, 71) * 14) / 3); if (on > 0) disc(hash(i, 72) * 1920 + 30 * Math.sin(b * .5 + i), fr(hash(i, 73) - b * (.008 + .01 * hash(i, 74))) * 940, 4 + 2 * hash(i, 75), dust * on * (hash(i, Math.floor(b * 8)) < .5 ? 1 : .5)); }
+  // the ground: one line
+  const gl = ease(b / 3);
+  p.beginPath(); p.moveTo(960 - 920 * gl, GROUND); p.lineTo(960 + 920 * gl, GROUND); p.strokeStyle = ink(.85); p.lineWidth = 4; p.stroke();
+  for (let i = 0; i < PLANTS.length; i++) plant(i, b, s);
+  // the melody: each note rings from the flower whose lane matches its pitch (low notes left, high notes right)
+  for (const [age, m] of s.notes) { const i = clamp(Math.round((m - 64) / 16 * 10), 0, 10), [H, t0] = PLANTS[i], f = 1 - age / .75;
+    p.save(); p.setLineDash([4, 12]); p.beginPath(); p.arc(SUN_X + (i - 5) * LANE, GROUND - H * growth(b, t0), 74 + age * 26, 0, TAU); p.strokeStyle = ink(.8 * f); p.lineWidth = 3.5; p.stroke(); p.restore(); }
 }
 
 // ---------- ink: every cell becomes one glyph; density and opacity follow the painting ----------
-const LEVELS = ['.,', ':;', '-~', '+=', '<>/', '*{}', '01o', 'wm', 'M8B', '#%@'];          // the studio's gradient ramp, with code glyphs mixed in
+const LEVELS = ['.,', ':;', "'`", '+*', '<>/', '{}()', '01o', 'xea', 'wm8', 'B#%@'];       // light to dark, code glyphs throughout
 const atlas = document.createElement('canvas'), GL = [];
-{ LEVELS.forEach((set) => [...set].forEach((ch) => GL.push(ch))); atlas.width = GL.length * 12; atlas.height = 14; const a = atlas.getContext('2d');
-  a.font = '700 10px Menlo, Consolas, "DejaVu Sans Mono", monospace'; a.textBaseline = 'middle'; a.textAlign = 'center'; a.fillStyle = INK; GL.forEach((ch, i) => a.fillText(ch, i * 12 + 6, 7)); }
+{ LEVELS.forEach((set) => [...set].forEach((ch) => GL.push(ch))); atlas.width = GL.length * 10; atlas.height = 12; const a = atlas.getContext('2d');
+  a.font = '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace'; a.textBaseline = 'middle'; a.textAlign = 'center'; a.fillStyle = INK; GL.forEach((ch, i) => a.fillText(ch, i * 10 + 5, 6)); }
 const LSTART = []; { let n = 0; LEVELS.forEach((set) => { LSTART.push(n); n += set.length; }); }
 const paper = document.createElement('canvas'); paper.width = 1920; paper.height = 1080;
 { const a = paper.getContext('2d'); a.fillStyle = PAPER; a.fillRect(0, 0, 1920, 1080);
@@ -165,36 +162,57 @@ function frame(b) {
   const s = song(b); paint(b, s);
   sm.drawImage(big, 0, 0, C, R); const d = sm.getImageData(0, 0, C, R).data;
   cx.globalAlpha = 1; cx.drawImage(paper, 0, 0);
-  const tick = Math.floor(b * 8), disp = clamp((b - 138) / 13.5), fadeOut = 1 - ease((b - 151) / 1.5);
+  const beatN = Math.floor(b * 4), disp = clamp((b - 139) / 12.5), fadeOut = 1 - ease((b - 151) / 1.5);
   for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
-    let v = d[(y * C + x) * 4] / 255; if (v < .055) continue;
-    v = clamp(v + (hash(x, y, tick) - .5) * .12);                                           // the stipple breathes on the 8th notes
-    const lv = Math.min(LEVELS.length - 1, Math.pow(v, .72) * LEVELS.length | 0), set = LEVELS[lv], gi = LSTART[lv] + (hash(x, y, tick >> 1) * set.length | 0);
-    let px = x * CW - 3, py = y * CH - 3, al = (.3 + .7 * v) * fadeOut;
+    let v = d[(y * C + x) * 4] / 255; if (v < .07) continue;
+    const h0 = hash(x, y, 3);
+    v = clamp(v + (hash(x, y, beatN + (h0 * 4 | 0)) - .5) * .07);                             // the stipple breathes, a quarter of the cells each beat
+    const lv = Math.min(LEVELS.length - 1, Math.pow(v, .78) * LEVELS.length | 0), set = LEVELS[lv], gi = LSTART[lv] + (hash(x, y, (beatN + (h0 * 8 | 0)) >> 3) * set.length | 0);
+    let px = x * CW - 3, py = y * CH - 3, al = (.36 + .64 * v) * fadeOut;
     if (disp > 0) { const h1 = hash(x, y, 91), h2 = hash(x, y, 92), ph = clamp((disp - .3 * h1) / .7); if (ph > 0) {      // stardust: the ink lifts off the paper (glyph-grid-studio's dispersal)
         px += (h2 - .5) * 2 * .3 * 430 * ph + Math.sin(b * 2 + h1 * TAU) * 9 * ph; py -= ph * 430 * (.4 + .6 * h2); al *= Math.pow(1 - ph, 1.6); } }
     if (al < .02) continue;
-    cx.globalAlpha = al; cx.drawImage(atlas, gi * 12, 0, 12, 14, px, py, 12, 14);
+    cx.globalAlpha = al; cx.drawImage(atlas, gi * 10, 0, 10, 12, px, py, 10, 12);
   }
   cx.globalAlpha = 1;
 }
 
+// ---------- layout check: nothing may touch anything else, at any bar (run viz.check() in the console, or tools/viz/check_layout.mjs) ----------
+// Flower heads against each other, against the sun's halo and against the frame; the title against the sun and the stems under it.
+function sunOuter(b) { const s = song(b); return 70 + 34 * s.L + 7 * s.kick + 18 + SUN_REACH(s.L); }
+function headAt(i, b) { const s = song(b), [H, t0, type, hr, tOpen] = PLANTS[i], g = growth(b, t0), x0 = SUN_X + (i - 5) * LANE;
+  const sway = (5 + (i % 4 === s.root ? 7 * s.bass : 0)) * Math.sin(b * Math.PI / 4 + i * 1.7), bud = ease((b - t0 - 14) / 4);
+  const r = bud > 0 ? hr * bud * (.62 + .38 * ease((b - tOpen) / 9)) * (1 + .04 * s.kick) * (type === 2 ? 1.3 : 1.02) : g > 0 ? 11 : 0;
+  return { x: x0 + sway, y: GROUND - H * g, r, g }; }
+function check(step = .125) { const bad = [], say = (b, m) => { if (bad.length < 40) bad.push(`bar ${(b + 1).toFixed(2)}: ${m}`); };
+  for (let b = 0; b < BARS; b += step) { const hs = PLANTS.map((_, i) => headAt(i, b)), so = sunOuter(b);
+    hs.forEach((h, i) => { if (!h.r) return;
+      if (Math.hypot(h.x - SUN_X, h.y - SUN_Y) < h.r + so + 6) say(b, `flower ${i} touches the sun's halo (gap ${(Math.hypot(h.x - SUN_X, h.y - SUN_Y) - h.r - so).toFixed(0)} px)`);
+      if (h.y - h.r < 6 || h.x - h.r < 6 || h.x + h.r > 1914) say(b, `flower ${i} leaves the frame`);
+      if (i && hs[i - 1].r && Math.hypot(h.x - hs[i - 1].x, h.y - hs[i - 1].y) < h.r + hs[i - 1].r + 6) say(b, `flowers ${i - 1} and ${i} touch`);
+      if (b < 8 && Math.abs(h.x - SUN_X) < 400 + h.r && h.y - h.r < 560 + 91 + 8) say(b, `flower ${i} reaches the title`); });
+    if (b < 8 && SUN_Y + so > 552) say(b, 'the sun reaches the title'); }
+  return bad; }
+
 // ---------- clocks: ?bar=N holds one frame; otherwise the master plays and the picture follows its time ----------
 const params = new URLSearchParams(location.search), go = document.getElementById('go');
-window.viz = { BPM, BARS, TAIL, frame, song, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: true };
-if (params.has('bar')) { go.remove(); frame(+params.get('bar')); }
-else {
-  frame(3);
-  go.onclick = () => {
-    go.remove();
-    const audio = new Audio(params.get('audio') || '/renders/slow-light-master-14.mp3'); window.viz.audio = audio;
-    const from = +params.get('from') || 0; let t0 = null;
-    audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM; audio.play(); });
-    audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });       // no master yet: run silent on the wall clock
-    const loop = (t) => { const sec = t0 === null ? audio.currentTime : (t - t0) / 1000; frame(Math.min(sec * BPM / 240, BARS + TAIL)); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
-  };
-}
+window.viz = { BPM, BARS, TAIL, frame, song, PLANTS, growth, check, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: false };
+fetch('slow-light-spectrum.json').then((r) => r.json()).then((j) => { SPEC = { fps: j.fps, frames: j.frames, d: Uint8Array.from(atob(j.data), (ch) => ch.charCodeAt(0)) }; })
+  .catch((e) => console.error('no spectrum file: the sun will not move', e))
+  .finally(() => {
+    window.viz.ready = true;
+    if (params.has('bar')) { go.remove(); frame(+params.get('bar')); return; }
+    frame(3);
+    go.onclick = () => {
+      go.remove();
+      const audio = new Audio(params.get('audio') || '/renders/slow-light-master-14.mp3'); window.viz.audio = audio;
+      const from = +params.get('from') || 0; let t0 = null;
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM; audio.play(); });
+      audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });     // no master yet: run silent on the wall clock
+      const loop = (t) => { const sec = t0 === null ? audio.currentTime : (t - t0) / 1000; frame(Math.min(sec * BPM / 240, BARS + TAIL)); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    };
+  });
 </script>
 </body>
 </html>

@@ -102,8 +102,8 @@ def main():
                 # visualiser pages (tools/viz/*.html) and finished audio from renders/ for them to play (Range supported, for seeking)
                 rel = self.path.split("?")[0].lstrip("/")
                 f = (ROOT / ("tools/" + rel if rel.startswith("viz/") else rel)).resolve()
-                types = {".html": "text/html; charset=utf-8", ".mp3": "audio/mpeg", ".wav": "audio/wav"}
-                ok = ((ROOT / "tools" / "viz").resolve() in f.parents and f.suffix == ".html") or ((ROOT / "renders").resolve() in f.parents and f.suffix in (".mp3", ".wav"))
+                types = {".html": "text/html; charset=utf-8", ".json": "application/json", ".mp3": "audio/mpeg", ".wav": "audio/wav"}
+                ok = ((ROOT / "tools" / "viz").resolve() in f.parents and f.suffix in (".html", ".json")) or ((ROOT / "renders").resolve() in f.parents and f.suffix in (".mp3", ".wav"))
                 if not (ok and f.is_file()):
                     self.send_error(404); return
                 size = f.stat().st_size; a, z = 0, size - 1
