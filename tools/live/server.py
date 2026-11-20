@@ -49,7 +49,7 @@ def main():
                 print(f"saved renders/{m.group(2)} ({n} bytes)", flush=True)
 
         def do_GET(self):
-            if self.path == "/":
+            if self.path.split("?")[0] == "/":                       # the live page takes ?stems=, ?bars=, ?warm=
                 body = PAGE.read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -98,6 +98,39 @@ def main():
                     self.wfile.write(body)
                 else:
                     self.send_error(404)
+            elif self.path.startswith(("/viz/", "/renders/")):
+                # visualiser pages (tools/viz/*.html) and finished audio from renders/ for them to play (Range supported, for seeking)
+                rel = self.path.split("?")[0].lstrip("/")
+                f = (ROOT / ("tools/" + rel if rel.startswith("viz/") else rel)).resolve()
+                types = {".html": "text/html; charset=utf-8", ".mp3": "audio/mpeg", ".wav": "audio/wav"}
+                ok = ((ROOT / "tools" / "viz").resolve() in f.parents and f.suffix == ".html") or ((ROOT / "renders").resolve() in f.parents and f.suffix in (".mp3", ".wav"))
+                if not (ok and f.is_file()):
+                    self.send_error(404); return
+                size = f.stat().st_size; a, z = 0, size - 1
+                import re
+                m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
+                if m and (m.group(1) or m.group(2)):
+                    if m.group(1):
+                        a = int(m.group(1)); z = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+                    else:
+                        a = max(0, size - int(m.group(2)))
+                    if a > z or a >= size:
+                        self.send_error(416); return
+                    self.send_response(206); self.send_header("Content-Range", f"bytes {a}-{z}/{size}")
+                else:
+                    self.send_response(200)
+                self.send_header("Content-Type", types[f.suffix]); self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Content-Length", str(z - a + 1)); self.send_header("Cache-Control", "no-cache"); self.end_headers()
+                try:
+                    with open(f, "rb") as fh:
+                        fh.seek(a); left = z - a + 1
+                        while left > 0:
+                            chunk = fh.read(min(left, 1 << 20))
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk); left -= len(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    return
             elif self.path.startswith("/samples/"):
                 # our own sample packs, served to the page only (same origin)
                 f = (ROOT / self.path.lstrip("/").split("?")[0]).resolve()
