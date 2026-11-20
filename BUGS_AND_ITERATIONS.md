@@ -294,3 +294,8 @@ Joona: "put a folder in my downloads called Baby Ash project ... the video ... t
 Open before release (Joona's call): the intro says "This is Boiler Room" (another company's brand) and shouts out Anthropic and Claude; Claudio is styled after Claude's mascot.
 
 RSI: ~25 min, 1 framing round -> no loss worth fixing.
+
+## ITER-029 (2026-11-20): track 11 "Night Shift", deadmau5 x Kaskade progressive house
+Joona: "deadmau5 x kaskade is what we want to emulate ... deadmau5 signature synths", with a brief on the mau5 method (few layers at full fidelity, clean low end, filter-envelope pluck opening over 32-64 bars instead of risers, micro-automation, loop resolution). Cooked live in four pushes (groove; Summit roll + organ; pluck arp + pad; full arrangement), every push checked for eval errors and events per layer on the scheduler. Final: 128 BPM, A minor, Am9 Fmaj9 C^7 G6, 96 bars (intro 16, journey 32, breakdown 16, drop 24, outro 8). Only kick and bass sit below 180 Hz (every other layer high-passed); the 3-3-2 chord-stab pluck opens 300 -> 3400 Hz across the sections; reverb and pan drift slowly; original melody, no samples from the reference tracks. `patterns/11-night-shift.strudel.js`.
+
+RSI: ~20 min, 4 live pushes -> top loss: none heard yet (verification is event counts, not a listen) -> fix: Joona's listen is the test; render a WAV when he signs off.
