@@ -47,6 +47,12 @@ null_db = db(np.sqrt(res_sq / frames)) - db(np.sqrt(sq["master"] / frames))
 print(f"null test: stems minus full mix = {null_db:.1f} dB relative to the mix")
 print(f"full mix as played: peak {db(peak['master']):+.1f} dBFS  ->  {'CLIPS at the output' if peak['master'] > 1 else 'no clipping'}")
 
+if kick_on is None:
+    sys.exit("the kick stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
+for k in LAY:
+    if peak[k] <= 0:
+        sys.exit(f"the {k} stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
+
 # 2. bar 1 from the first kick, and the kick gate (a throttled page drops hits, BUG-013)
 t0 = kick_on / SR - (a.first_kick_bar - 1) * BAR
 dur = (a.bars + a.tail_bars) * BAR
