@@ -14,6 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("raw"); ap.add_argument("out")
 ap.add_argument("--bpm", type=float, required=True); ap.add_argument("--bars", type=int, required=True)
 ap.add_argument("--first-kick-bar", type=int, required=True, help="1-based bar of the first kick")
+ap.add_argument("--music-hp", type=float, default=170, help="high-pass on the music bus in Hz; lower it for a low arp (Aura B: 80)")
 ap.add_argument("--rate", type=int, default=44100); ap.add_argument("--tail-bars", type=float, default=1.5)
 a = ap.parse_args()
 LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "music": (5, 2), "bass": (7, 1), "bell": (8, 2), "other": (10, 2)}
@@ -82,7 +83,7 @@ graph = ";".join([
     # drum chain: kick and tops through one compressor so they move together, then gentle saturation
     "[kick][drums]amix=inputs=2:normalize=0,acompressor=threshold=-16dB:ratio=2.5:attack=15:release=120:knee=4:makeup=1.6,asoftclip=type=tanh:threshold=0.75[drumbus]",
     st("bass", "highpass=f=30,lowpass=f=5000"),
-    st("music", "highpass=f=170"),                    # pluck, pad, lead: nothing of theirs below the bass
+    st("music", f"highpass=f={a.music_hp:g}"),         # pluck and glass: 170 Hz keeps them above the bass; a low arp needs less
     st("bell", "highpass=f=300"),
     st("other", "highpass=f=120"),                   # pads and vocals on orbits 5-8
     "[drumbus][bass][music][bell][other]amix=inputs=5:normalize=0,"

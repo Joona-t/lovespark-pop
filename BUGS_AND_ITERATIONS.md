@@ -452,3 +452,14 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Live page:** now plays version B (`patterns/live.strudel.js` = `12-aura-b`).
 - **Not verified:** his listen of either version.
 - RSI: capture 290 s real time, mix about 1 min -> nothing lost -> none needed.
+
+## BUG-016 (2026-11-21): the mixer's fixed 170 Hz high-pass would have cut Aura B's low arp
+- **Symptom (caught before delivery):** B's first master used the music-bus high-pass of 170 Hz. Measured on the captured stems over 30 s of the drop, 43.5% of B's music-bus energy lies below 170 Hz (A: 1.7%), so the master removed most of the depth Joona asked for.
+- **Root cause:** `tools/mix_live.py` hard-coded the music-bus high-pass for arps that sit above the bass; B moved the arp down an octave (C2 to B3).
+- **Fix:** `--music-hp` (default 170, unchanged for every other track); B remastered with `--music-hp 80`. Master B: -14.2 LUFS, LRA 9.7, -1.2 dBTP, null -34.6 dB, kicks four per bar in 33-80 and 105-152.
+- **Not proven:** a master-level band measure (80-170 Hz) cannot tell the two B masters apart because the bass dominates that band; the check that found it is the per-stem one. Prevention: measure the music stem's energy below the high-pass before mastering whenever an arp or lead changes octave.
+
+## ITER-047 (2026-11-21): Aura A and B filed; melody audition on the live page
+- Both masters in Downloads, `Bvby Ash project/Aura`: 24-bit 48k, 16-bit 44.1k, 320k MP3 each. B's MP3 sent to Joona.
+- The live page now plays an audition (not committed, by his wish "switch a lot live before we save anything"): six voices for the melody, 8 bars each, over the bloom: FM bell, bell an octave down, grand piano with chords, Rhodes chords, a soft synth lead an octave down, celesta. Verified: no eval error, each slot plays only its voice (bell 20, bell down 20, piano 100, Rhodes 120, lead 20+20, celesta 20 notes).
+- RSI: B mastered twice -> one master lost to the fixed high-pass -> per-stem low-band check before mastering.
