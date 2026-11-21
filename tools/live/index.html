@@ -103,9 +103,9 @@
   es.onerror = () => { status.textContent = 'server not reachable, retrying…'; };
   // ---------- stem capture: /?stems=<name>&bars=<N> records the full mix and every bus, sample-aligned, to renders/<name>.f32 ----------
   // Same method as the club page: one worklet takes all buses as channels of a single stream (raw 32-bit float).
-  // Buses by orbit: kick 9, drums 1 (the default orbit), music 2, bass 3, bell 4. The speakers stay on; keep the pane visible (BUG-013).
+  // Buses by orbit: kick 9, drums 1 (the default orbit), music 2, bass 3, bell 4, other 5-8. The speakers stay on; keep the pane visible (BUG-013).
   const params = new URLSearchParams(location.search);
-  const STEMS = [['master', null, 2], ['kick', 9, 1], ['drums', 1, 2], ['music', 2, 2], ['bass', 3, 1], ['bell', 4, 2]];
+  const STEMS = [['master', null, 2], ['kick', 9, 1], ['drums', 1, 2], ['music', 2, 2], ['bass', 3, 1], ['bell', 4, 2], ['other', [5, 6, 7, 8], 2]];   // 'other' sums orbits 5-8 (pads, vocals) so the stems always add up to the mix
   async function captureStems(name, ctx) {
     const total = STEMS.reduce((a, x) => a + x[2], 0);
     const st = window.stems = { name, channels: total, rate: ctx.sampleRate, frames: 0, sent: 0, state: 'recording', layout: STEMS.map(([n, , c]) => n + ':' + c).join(' ') };
@@ -120,7 +120,8 @@
       const sink = ctx.createGain(); sink.gain.value = 0; merger.connect(node); node.connect(sink).connect(ctx.destination);
       let ch = 0;
       for (const [, orbit, n] of STEMS) {
-        const out = orbit == null ? c.output.destinationGain : c.getOrbit(orbit).output;
+        const outs = orbit == null ? [c.output.destinationGain] : [orbit].flat().map((o) => c.getOrbit(o).output);
+        const out = { connect: (d) => outs.forEach((x) => x.connect(d)) };   // several orbits sum into one stem
         if (n === 2) { const sp = ctx.createChannelSplitter(2); out.connect(sp); sp.connect(merger, 0, ch); sp.connect(merger, 1, ch + 1); }
         else { const mono = ctx.createGain(); mono.channelCount = 1; mono.channelCountMode = 'explicit'; out.connect(mono); mono.connect(merger, 0, ch); }
         ch += n;

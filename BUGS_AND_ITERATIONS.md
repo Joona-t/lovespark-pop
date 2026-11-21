@@ -424,3 +424,15 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error; 41 melody notes per 16 bars: bloom 41 bell, groove 41 lead, full 41 lead + 41 shimmer, none in air or pulse; 0 notes outside their bar's chord across all 80 bars; 15 of 16 lead bars distinct by pitch (bars 11 and 14 share G E B in different rhythms).
 - **Not verified:** how it sounds; his listen.
 - RSI: 1 save, 1 check -> nothing lost -> none needed.
+
+## ITER-044 (2026-11-21): track 12 "Aura" finished: breakdown, build, drop, outro
+- **Asked:** "Yes, breakdown + drop", then "yeah finish it you clearly have the vision."
+- **Done:** 152 bars (~4:45): air 16 · bloom 16 · pulse 16 · groove 16 · full 16 · breakdown 16 (drums out; drone, bell, a soft lead, the pluck closing 2600 -> 800 Hz) · build 8 (a 909 snare roll doubling every 2 bars, a white-noise riser, the pluck tearing open 900 -> 4200 Hz, then half a bar of silence) · drop 16 (everything, brightest) · drop II 16 (the bell returns an octave up over the lead, pluck 3800 -> 4400) · outro 16 (drums thin, the pluck closes to 300 Hz). Named "Aura" from Joona's own word for the opening; saved as `patterns/12-aura.strudel.js`.
+- **Verified:** no eval error; 0 notes outside their chord across 152 bars; 0 events in the half bar before the drop; kicks per section 0, 0, 64, 64, 64, 0, 0, 64, 64, 64; 41 bell notes in drop II, none in drop I.
+- RSI: 3 saves, 3 checks -> nothing lost -> none needed.
+
+## BUG-015 (2026-11-21): stem capture missed orbits 5-8, and the mixer would have mastered without them
+- **Symptom (caught before any render):** "Aura" puts its pad on orbit 5. The live page's stem capture recorded only orbits 1, 2, 3, 4 and 9, so the pad would have been missing from every stem, and `tools/mix_live.py` builds the master from the stems: the master would have had no pad. Tracks 09 and 10 also use orbits 5-8.
+- **Root cause:** `STEMS` in `tools/live/index.html` listed fixed orbits, and the mixer printed the null test without acting on it, so a missing bus could pass silently.
+- **Fix:** a seventh stem, `other`, sums orbits 5-8 (12 channels now); the mixer reads it (high-pass 120 Hz, into the mix bus) and now stops with "the stems do not add up to the mix" when the null test is worse than -20 dB. Channel count is derived from the layout.
+- **Proof the check works:** a synthetic capture with the pad in the master but not in the stems stops at null -3.0 dB, "nothing mixed"; the complete one passes the gate (null -148.9 dB). Slow Light's real captures nulled at -33 to -35 dB, well inside the gate.

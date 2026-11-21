@@ -2,7 +2,8 @@
 
     .venv/bin/python tools/mix_live.py renders/<name>.f32 renders/<out-prefix> --bpm 128 --bars 152 --first-kick-bar 9
 
-Input: raw 32-bit float, 10 channels at the page's sample rate: master 2, kick 1, drums 2, music 2, bass 1, bell 2.
+Input: raw 32-bit float, 12 channels at the page's sample rate: master 2, kick 1, drums 2, music 2, bass 1, bell 2, other 2
+(other = orbits 5-8). Stops before mixing if the stems do not add up to the full mix (null test worse than -20 dB).
 Same method as tools/mix.py (the club set): null test, bar 1 from the first kick, the balance as played with corrective
 processing only, masters to a loudness target, every number printed and saved to <out-prefix>-mix-report.json.
 """
@@ -15,8 +16,8 @@ ap.add_argument("--bpm", type=float, required=True); ap.add_argument("--bars", t
 ap.add_argument("--first-kick-bar", type=int, required=True, help="1-based bar of the first kick")
 ap.add_argument("--rate", type=int, default=44100); ap.add_argument("--tail-bars", type=float, default=1.5)
 a = ap.parse_args()
-RAW, OUT, SR, N, BAR = a.raw, a.out, a.rate, 10, 240.0 / a.bpm
-LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "music": (5, 2), "bass": (7, 1), "bell": (8, 2)}
+LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "music": (5, 2), "bass": (7, 1), "bell": (8, 2), "other": (10, 2)}
+RAW, OUT, SR, N, BAR = a.raw, a.out, a.rate, sum(c for _, c in LAY.values()), 240.0 / a.bpm
 db = lambda v: -200.0 if v <= 0 else 20 * np.log10(v)
 
 x = np.memmap(RAW, dtype="<f4", mode="r")
@@ -47,10 +48,12 @@ null_db = db(np.sqrt(res_sq / frames)) - db(np.sqrt(sq["master"] / frames))
 print(f"null test: stems minus full mix = {null_db:.1f} dB relative to the mix")
 print(f"full mix as played: peak {db(peak['master']):+.1f} dBFS  ->  {'CLIPS at the output' if peak['master'] > 1 else 'no clipping'}")
 
+if null_db > -20:
+    sys.exit(f"null test {null_db:.1f} dB: the stems do not add up to the mix, a bus is not captured; nothing mixed")
 if kick_on is None:
     sys.exit("the kick stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
 for k in LAY:
-    if peak[k] <= 0:
+    if peak[k] <= 0 and k != "other":            # other is empty when a track uses only orbits 1-4 and 9
         sys.exit(f"the {k} stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
 
 # 2. bar 1 from the first kick, and the kick gate (a throttled page drops hits, BUG-013)
@@ -73,7 +76,7 @@ def st(name, chain):
     o, c = LAY[name]
     return f"[s_{name}]pan=stereo|c0=c{o}|c1=c{o + (1 if c == 2 else 0)},volume={pre:.2f}dB,{chain}[{name}]"
 graph = ";".join([
-    "[0:a]asplit=5" + "".join(f"[s_{k}]" for k in LAY if k != "master"),
+    f"[0:a]asplit={len(LAY) - 1}" + "".join(f"[s_{k}]" for k in LAY if k != "master"),
     st("kick", "highpass=f=28"),
     st("drums", "highpass=f=250"),
     # drum chain: kick and tops through one compressor so they move together, then gentle saturation
@@ -81,7 +84,8 @@ graph = ";".join([
     st("bass", "highpass=f=30,lowpass=f=5000"),
     st("music", "highpass=f=170"),                    # pluck, pad, lead: nothing of theirs below the bass
     st("bell", "highpass=f=300"),
-    "[drumbus][bass][music][bell]amix=inputs=4:normalize=0,"
+    st("other", "highpass=f=120"),                   # pads and vocals on orbits 5-8
+    "[drumbus][bass][music][bell][other]amix=inputs=5:normalize=0,"
     "acompressor=threshold=-15dB:ratio=1.5:attack=30:release=220:knee=6:makeup=1,"
     f"afade=t=in:st=0:d=0.01,afade=t=out:st={a.bars * BAR:.2f}:d={a.tail_bars * BAR:.2f}:curve=qsin[mix]",   # only the delay tail fades
 ])

@@ -1,7 +1,8 @@
-// 12 (untitled) · deadmau5 x John Summit, 128 BPM, E minor
+// 12 "Aura" · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
+// The name is Joona's word for the opening: "this aura of airy emotional resonance".
 // Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
 // Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
-// Sections, 16 bars each (one pass of the progression): air · bloom · pulse · groove · full
+// Sections, 152 bars (~4:45): air 16 · bloom 16 · pulse 16 · groove 16 · full 16 · breakdown 16 · build 8 · drop 32 · outro 16
 // From Joona's brief: the detuned saw pluck, patience, chords borrowed from the parallel major for a bittersweet lift.
 // (Scrapped today: a Summit bass loop, a Ganacci bounce, and a first mau5 x Summit sketch.)
 // @q 4
@@ -110,11 +111,23 @@ const shaker = s("~ hh ~ hh").fast(4).bank("RolandTR808").gain("[.08 .14]*8").hp
 const tom = s("<~ ~ ~ [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ lt ~ mt ~ ht ht]>").bank("RolandTR909").gain(.3).room(.3).orbit(1)
 const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.26).room(.4).orbit(1)
 
-// ---- the arrangement: 80 bars. The synths hold the room alone, then the drums arrive one by one ----
+// ---- build: a snare roll that doubles every 2 bars and a white-noise riser, both rising over 8 bars ----
+const roll = s("sd*<4 4 8 8 16 16 [16 32] 32>").bank("RolandTR909")
+  .gain(saw.range(.1, .55).slow(8)).hpf(saw.range(200, 1200).slow(8)).room(.3).orbit(1)
+const riser = s("white*16").decay(.07).sustain(0)
+  .lpf(saw.range(400, 9000).slow(8)).hpf(300).gain(saw.range(0, .22).slow(8)).pan(sine.range(.3, .7).fast(4)).orbit(1)
+
+// ---- the arrangement: 152 bars. The synths hold the room alone, then the drums arrive one by one ----
 arrange(
   [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],                           // air: pad, a whisper of pluck
   [16, stack(drone, bell, pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, a low drone, the melody as a far bell, still no drums
   [16, stack(kick.gain(.42), shaker, bass(260, .18), pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick, the shaker, the bass rolling in quietly
   [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), lead(1900, .22), pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
   [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), lead(), shimmer, pad, glass, pluck(2400, 3000))], // full: everything
+  [16, stack(drone, bell.gain(.26), lead(1100, .16), pad.gain(.2), glass, pluck(2600, 800))],   // breakdown: drums out, the melody gets the room, the pluck closes
+  [8,  stack(roll, riser, pad, glass, lead(1400, .2), pluck(900, 4200)).mask("<1!7 [1 0]>")],     // build: roll, riser, pluck tears open, half a bar of silence
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), lead(2800, .3), shimmer, pad, glass, pluck(3200, 3800))], // drop: everything, brightest
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), lead(3200, .3), shimmer.gain(.12),
+             bell.add(note(12)).gain(.12), pad, glass, pluck(3800, 4400))],                         // drop II: the bell returns an octave up over the lead, the pluck opens once more
+  [16, stack(kick.gain(.5), hats.gain(.7), shaker, bass(380, .28), pad, glass, pluck(2400, 300))],  // outro: drums thin out, the pluck closes back to air
 )
