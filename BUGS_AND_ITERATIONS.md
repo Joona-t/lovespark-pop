@@ -521,3 +521,10 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** melody bus in the ending = soft synth only (41 + 41 notes); kick and bass silent after bar 8. Pulse measured as the high band's swing within each beat: old metronome ending 45.1 dB; new bars 1-8 18.1 dB, bars 9-16 6.6 dB; high band -34.6 / -32.1 dBFS vs -22.8.
 - **Measurement correction:** the beat-lag autocorrelation used earlier is fragile for sharp clicks (one 5 ms frame of lag rounding moved the old ending from 0.97 to 0.67); the swing per beat is the measure to use for ticks.
 - RSI: 3 preview renders -> the bell's removal unmasked the arp's accent and the sidechain breathing -> after removing any part, re-run the tick measure on what is left.
+
+## ITER-055 (2026-11-21): full re-master held back by the tick scan; open hat under test
+- **Asked:** "Yes, re-master" (after the airy ending), with "always double check".
+- **New check:** a per-section tick scan (high band > 4 kHz level and its swing within each beat; flags a loud section swinging over 30 dB). Calibrated on the old master with the tick Joona heard: it flags that outro (44.8 dB at -22.7 dBFS) and the full and drops (35-36 dB) where the same shaker played.
+- **Masters (renders/aura-r6, aura-b-r6):** A -9.3 LUFS, LRA 5.8, -1.3 dBTP, slope -0.749; B -9.4, 4.8, -1.3, -0.765; null -34.9 dB; kicks bars 33-80 and 105-144. Outro passes (15.2 / 12.7 dB). Full and drops still flagged (about 36 dB at -19 dBFS), so the masters were NOT put in the folder.
+- **Cause found:** the off-beat open hat, kept on purpose when the closed hats moved to the kick, but still a hi-hat between every kick, against Joona's "just have it hit with the kick". Drop preview without it: high band -21.8 -> -27.3 dBFS, swing 40.6 -> 34.4 dB. The rest is the hat on the kick and the clap, which he asked for; the 30 dB line cannot tell a clap from a metronome, so the call goes to his ears (previews 7a/7b sent).
+- RSI: 2 full masters held -> I kept a part that went against his instruction -> follow the instruction literally for every part of that kind, and scan before filing.
