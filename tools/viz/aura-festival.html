@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura (Festival Version) · the whole field sings</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1114; overflow: hidden; }
+  canvas { position: fixed; inset: 0; margin: auto; aspect-ratio: 16 / 9; width: 100vw; height: auto; max-height: 100vh; display: block; }
+  @media (min-aspect-ratio: 16/9) { canvas { width: auto; height: 100vh; } }
+  #go { position: fixed; inset: 0; margin: auto; width: 9rem; height: 3rem; font: 700 1rem ui-monospace, Menlo, monospace; letter-spacing: .25em;
+        color: #e6d6ad; background: #16191d; border: 2px solid #e6d6ad; border-radius: 4px; cursor: pointer; }
+  #go:hover, #go:focus-visible { background: #22262c; outline: 2px solid #e6d6ad; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080" aria-label="Aura Festival Version visualiser: a full-screen grid of glyphs computed from the music, moving through standing waves, quasicrystals, aurora curtains, a tunnel, wave interference, a strange attractor and a kaleidoscopic fractal, dissolving into cells of dots between figures, over a field of vertical hatching"></canvas>
+<button id="go">PLAY</button>
+<script>
+// Aura (Festival Version) · the second video. Joona: "have it build visuals and dont have it limited to the circle i want the
+// full screen including glyph grid staying as well", then "make this the SOTA. Highly complex & intricate beyond what any human can do".
+// A glyph shader: the frame is a fixed grid of 320 x 120 glyph cells, and every cell of every frame is computed from the bar
+// position and the master's spectrum (a pure function: no state, no Math.random). Where the figure is thin the lovespark.love
+// vertical hatching shows through, so the glyph grid never leaves the screen.
+//   air, bloom, pulse   standing waves of a rectangular plate, full frame; every bell note ripples out from its pitch's place
+//   groove              a quasicrystal: as many plane waves as the chord has spokes, drifting against each other
+//   breakdown           aurora: curtains of glyph light (three, then five when the second arp joins)
+//   build               a tunnel that accelerates and gains a ring per bar; bar 64 lies flat under one thrown stab
+//   drop 1              wave sources interfering: the kick at the centre, two in orbit, and a new one for every vocal stab
+//   breakdown II        a de Jong strange attractor, 260,000 points a frame, its four parameters drifting
+//   drop 2              a kaleidoscopic Julia set folded to the chord's symmetry; the 303 line steers its constant
+//   peak                the Julia set and the quasicrystal together, the bell an octave up ringing white over both
+//   outro, ring-out     the quasicrystal calms, the aurora returns and thins, the hatching is the last thing left
+//   between every chord the figure dissolves into cells of dots (four lattices, four boom orders), then boom, boom, boom
+const BPM = 128, BARS = 138, TAIL = 0;
+const QS = new URLSearchParams(location.search), OFF = 0;             // the master starts on bar 1 (lag vs premaster within 0.12 ms)
+const BG = '#14171b';
+const SW = 1920, SH = 1080, GW = 6, GH = 9, COLS = SW / GW, ROWS = SH / GH, NCELL = COLS * ROWS;
+const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+const PI = Math.PI, TAU = PI * 2, fr = (v) => v - Math.floor(v);
+const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
+const ease = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
+const lerp = (a, z, t) => a + (z - a) * t;
+const within = (b, a, z) => b >= a && b < z;
+function hash(a, b = 0, c = 0) { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+// ---------- the song, as data (patterns/12-aura-festival.strudel.js, bars counted from 0) ----------
+const SECTIONS = [[0, 8, 'air', 300, 900], [8, 16, 'bloom', 900, 1600], [16, 24, 'pulse', 1600, 2000], [24, 40, 'groove', 1900, 2600],
+  [40, 56, 'breakdown', 1200, 3000], [56, 64, 'build', 900, 4200], [64, 80, 'drop1', 3200, 4200], [80, 88, 'breakdown2', 1600, 2800],
+  [88, 104, 'drop2', 3600, 4400], [104, 112, 'peak', 4200, 4600], [112, 136, 'outro', 2400, 300], [136, 138, 'ringout', 300, 300]];
+const SPOKES = [4, 6, 5, 3, 4, 6, 5, 7];        // one per chord: Em9 · Cmaj9 · Gmaj9 · D/F# | E add9 · Cmaj9 · Am9 · Bsus4->B7
+const TUNE = [[0,0,71],[0,3,78],[0,6,76],[1,0,74],[1,6,76],[1,7,78],[2,0,79],[2,3,76],[2,6,74],[3,0,76],[4,0,74],[4,3,71],[4,6,74],
+  [5,0,78],[5,4,79],[5,6,78],[6,0,76],[6,3,74],[6,6,69],[7,0,66],[8,0,80],[8,3,78],[8,6,76],[9,0,83],[9,4,80],[10,0,79],[10,3,76],
+  [10,6,71],[11,0,74],[11,4,76],[12,0,72],[12,3,76],[12,6,81],[13,0,79],[13,4,76],[13,6,71],[14,0,69],[14,3,71],[14,6,76],[15,0,75],[15,4,78]];  // [bar in 16, 8th step, midi]
+const CHOP = [[2, 5, 8, 12], [2, 5, 10, 13]];   // the vocal hook's 16ths, alternating bars
+const ACID = [12, 12, 24, 12, 12, 24, 12, 19, 12, 12, 24, 12, 24, 12, 19, 12];   // the 303 line, semitones above the root, per 16th
+const SILENT = [[63, 64], [87, 88]];            // the last bar of the build and of breakdown II: one thrown stab, nothing else
+const sec = (b) => SECTIONS.find(([a, z]) => b >= a && b < z) || SECTIONS[SECTIONS.length - 1];
+function light(b) { const [a, z, , lo, hi] = sec(b); return clamp(Math.log(lerp(lo, hi, clamp((b - a) / (z - a))) / 300) / Math.log(4600 / 300)); }
+function rings(b) { const n = sec(b)[2];
+  if (n === 'build') return 2 + Math.min(5, Math.floor(b - 56));
+  if (n === 'outro') return Math.max(1, 5 - Math.floor((b - 112) / 4.8));
+  return { air: 1, bloom: 2, pulse: 3, groove: 4, breakdown: 3, drop1: 5, breakdown2: 3, drop2: 6, peak: 7, ringout: 1 }[n]; }
+function amount(b) { if (b < 8) return .4 + .3 * ease(b / 8); if (b < 16) return .7 + .3 * ease((b - 8) / 8);
+  if (b >= 120) return 1 - .92 * ease((b - 121) / 14); return 1; }
+const kickOn = (b) => within(b, 16, 24) ? .7 : within(b, 24, 40) || within(b, 64, 80) || within(b, 88, 112) ? 1 : within(b, 112, 120) ? .5 : 0;
+const silent = (b) => SILENT.some(([a, z]) => b >= a && b < z);
+const silentStart = (b) => (SILENT.find(([a, z]) => b >= a && b < z) || [b])[0];
+function chopGain(bar) { return within(bar, 64, 80) || within(bar, 88, 104) ? 1 : within(bar, 56, 63) ? .45 + .55 * (bar - 56) / 7 : 0; }
+const stabGain = (b) => within(b, 88, 104) ? 1 : within(b, 104, 112) ? .8 : within(b, 80, 87) ? .2 : 0;
+function warmth(b) { const c = fr(b / 16) * 8; return c < 4 ? 0 : c < 6 ? ease((c - 4) * 3) : 1 - ease((c - 6) / 2) * .85; }
+function song(b) {
+  const beat = fr(b * 4), ci = Math.floor(b / 2) % 8, still = silent(b);
+  const s = { b, ci, L: light(b), kick: still ? 0 : kickOn(b) * Math.exp(-beat * 6), warm: warmth(b), amt: amount(b), chop: 0, chops: [],
+    stab: still ? 0 : stabGain(b) * Math.exp(-fr(b * 4 + .5) * 5), roll: within(b, 56, 63) ? ease((b - 56) / 7) : 0,
+    drop: within(b, 64, 66) ? Math.exp(-(b - 64) * 2.2) : within(b, 88, 90) ? 1.25 * Math.exp(-(b - 88) * 2.2) : 0, notes: [] };
+  // the vocal hook: every stab still sounding, [age in 16ths, a seed for its place, gain]
+  for (const bar of [Math.floor(b), Math.floor(b) - 1]) { const g = chopGain(bar); if (!g) continue;
+    for (const st of CHOP[((bar % 2) + 2) % 2]) { const age = (b - bar - st / 16) * 16; if (age >= 0 && age < 12) { s.chops.push([age, bar * 16 + st, g]); s.chop = Math.max(s.chop, g * Math.exp(-age * .8)); } } }
+  for (const [a] of SILENT) if (b >= a && b < a + 1) s.chop = Math.max(s.chop, Math.exp(-(b - a) * 16 * .35));   // the thrown stab
+  // bell notes ringing now, [age in bars, midi, gain]
+  const loop = Math.floor(b / 16) * 16;
+  for (const base of [loop - 16, loop]) for (const [br, st, m] of TUNE) { const t0 = base + br + st / 8, age = b - t0;
+    if (age < 0 || age >= 2) continue;
+    const g = within(t0, 8, 16) ? 1 : within(t0, 16, 24) ? .8 : within(t0, 24, 40) ? .6 : within(t0, 40, 56) ? .9 : within(t0, 104, 112) ? 1 : 0;
+    if (g) s.notes.push([age, within(t0, 104, 112) ? m + 12 : m, g]); }
+  for (const [a] of SILENT) if (b >= a && b < a + 1) s.notes.push([b - a, 74, 1]);   // the thrown stab ripples across the flat field
+  return s;
+}
+// the transition between figures: p = beats into this 2-bar chord. Cells of dots form over the last beat and a half; three
+// booms on beats 1, 2, 3 of the next chord each snap a third of the cells into the new figure. bm = the boom's impulse.
+function cells(b) { const c0 = Math.floor(b / 2) * 2, p = (b - c0) * 4; let bm = 0;
+  if (p < 3) bm = Math.exp(-fr(p) * 9);
+  const soft = kickOn(b) || within(b, 56, 112) ? 1 : .55;             // no drums: softer booms
+  return { bm: bm * soft, p }; }
+
+// ---------- the master's spectrum: 32 bands, 30 frames a second ----------
+let SPEC = null, CUM = null;
+function spectrum(b) { const out = new Float32Array(32); if (!SPEC) return out;
+  const f = clamp((b * 240 / BPM + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f), t = f - i;
+  for (let k = 0; k < 32; k++) out[k] = Math.pow(lerp(SPEC.d[i * 32 + k], SPEC.d[(i + 1) * 32 + k], t) / 255, 1.6);
+  return out; }
+function energy(i) { let e = 0; for (let k = 0; k < 32; k++) e += SPEC.d[i * 32 + k]; return e / (32 * 255); }
+function fieldTime(b) { const sx = b * 240 / BPM; if (!CUM) return sx * .8;
+  const f = clamp((sx + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f); return lerp(CUM[i], CUM[i + 1], f - i); }
+
+// ---------- noise (the lovespark.love field's own) ----------
+function vhash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = vhash(xi, yi), b = vhash(xi + 1, yi), c = vhash(xi, yi + 1), d = vhash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+function hatchField(x, y, t) { return .65 * vnoise(x * .11 + t * .06, y * .022 - t * .09) + .35 * vnoise(x * .31 - t * .04, y * .07 + t * .05); }
+
+// ---------- glyphs: one atlas, a row per colour ----------
+const SRAMP = ['.', '·:', ':;', "-'", '=+', '*+', '#x', '%&', '0{}', '1<>/@'];
+const HRAMP = ['╷', '┆', '╎', '¦', '│', '┃', '║'], BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const GLY = []; SRAMP.forEach((set) => [...set].forEach((ch) => GLY.push(ch)));
+const SSTART = []; { let n = 0; SRAMP.forEach((set) => { SSTART.push(n); n += set.length; }); }
+const DOT = GLY.length; GLY.push('·', '•', '●');
+const HAT = GLY.length; HRAMP.forEach((ch) => GLY.push(ch));
+// the palette, in an order that makes the useful blends neighbours: cyan · steel · gold · white · pink · violet
+const ANCH = [[112, 214, 232], [207, 216, 224], [233, 201, 160], [255, 246, 232], [255, 118, 170], [158, 136, 255]], HSTEP = 8, NC = (ANCH.length - 1) * HSTEP + 1;
+const TW = 10, TH = 12, atlas = document.createElement('canvas'); atlas.width = GLY.length * TW; atlas.height = NC * TH;
+{ const a = atlas.getContext('2d'); a.textBaseline = 'middle'; a.textAlign = 'center';
+  for (let row = 0; row < NC; row++) { const h = row / HSTEP, i = Math.min(ANCH.length - 2, Math.floor(h)), f = h - i;
+    a.fillStyle = `rgb(${ANCH[i].map((v, q) => Math.round(lerp(v, ANCH[i + 1][q], f))).join(',')})`;
+    GLY.forEach((ch, g) => { a.font = g >= HAT ? '11px ui-monospace, "SF Mono", Menlo, monospace' : g >= DOT ? '700 9px Menlo, Consolas, monospace' : '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace';
+      a.globalAlpha = g >= HAT ? .55 + .45 * (g - HAT + 1) / HRAMP.length : 1; a.fillText(ch, g * TW + TW / 2, row * TH + TH / 2); }); } }
+
+// ---------- the grid: everything that never changes, per cell ----------
+const PX = new Float32Array(NCELL), PY = new Float32Array(NCELL), U = new Float32Array(NCELL), V = new Float32Array(NCELL), R = new Float32Array(NCELL), A = new Float32Array(NCELL);
+const H7 = new Float32Array(NCELL), H61 = new Float32Array(NCELL), JC = new Float32Array(NCELL), JS = new Float32Array(NCELL), FLATK = new Float32Array(NCELL);
+const HSKIP = new Uint8Array(NCELL), TMASK = new Float32Array(NCELL), XC = new Float32Array(NCELL), YR = new Float32Array(NCELL), BAY = new Float32Array(NCELL), BAND = new Uint8Array(NCELL), INTITLE = new Uint8Array(NCELL);
+const TITLE = { x: 96, y: 930, w: 260, h: 100 };                     // box: x..x+w, y-56..y+44
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const i = r * COLS + c, px = c * GW + GW / 2, py = r * GH + GH / 2;
+  PX[i] = px; PY[i] = py; U[i] = (px - SW / 2) / (SH / 2); V[i] = (py - SH / 2) / (SH / 2); R[i] = Math.hypot(U[i], V[i]); A[i] = Math.atan2(V[i], U[i]);
+  H7[i] = hash(i, 7); H61[i] = hash(i, 61); const ang = hash(i, 21) * TAU, mag = .35 + .65 * hash(i, 22); JC[i] = Math.cos(ang) * mag; JS[i] = Math.sin(ang) * mag;
+  FLATK[i] = hash(i, 12) < .5 ? .16 + .06 * hash(i, 11) : 0;
+  XC[i] = px / 9; YR[i] = py / 15; BAY[i] = (BAYER[(r & 3) * 4 + (c & 3)] / 16 - .5) * .22; BAND[i] = Math.min(31, Math.abs(U[i]) / 1.7778 * 30 | 0);
+  HSKIP[i] = c & 1;
+  { const ddx = Math.max(TITLE.x - 26 - px, 0, px - (TITLE.x + TITLE.w + 26)), ddy = Math.max(TITLE.y - 78 - py, 0, py - (TITLE.y + 66)); TMASK[i] = 1 - ease(Math.hypot(ddx, ddy) / 70); }
+  INTITLE[i] = px > TITLE.x - 26 && px < TITLE.x + TITLE.w + 26 && py > TITLE.y - 56 - 22 && py < TITLE.y + 44 + 22 ? 1 : 0; }
+
+// ---------- the cell lattices: every glyph belongs to its nearest centre; four lattices, four orders for the booms ----------
+function lattice(cen) { const n = cen.length, cell = new Int32Array(NCELL), dn = new Float32Array(NCELL), mx = new Float32Array(n).fill(1);
+  for (let i = 0; i < NCELL; i++) { let bi = 0, bd = 1e12; const x = PX[i], y = PY[i];
+    for (let q = 0; q < n; q++) { const dx = x - cen[q][0], dy = y - cen[q][1], d = dx * dx + dy * dy; if (d < bd) { bd = d; bi = q; } }
+    cell[i] = bi; dn[i] = Math.sqrt(bd); if (dn[i] > mx[bi]) mx[bi] = dn[i]; }
+  for (let i = 0; i < NCELL; i++) dn[i] /= mx[cell[i]];
+  const grp = [0, 1, 2, 3].map(() => new Uint8Array(n)), h = new Float32Array(n), ph = new Float32Array(n);
+  for (let q = 0; q < n; q++) { const [x, y] = cen[q]; h[q] = hash(q, 10); ph[q] = hash(q, 3) * TAU;
+    grp[0][q] = Math.floor(hash(q, 9) * 3);                                                        // scattered thirds
+    grp[1][q] = Math.floor(clamp(Math.hypot(x - SW / 2, y - SH / 2) / 1101, 0, .999) * 3);          // from the centre out
+    grp[2][q] = Math.floor(clamp(x / SW, 0, .999) * 3);                                             // a sweep, left to right
+    grp[3][q] = Math.floor(fr(Math.atan2(y - SH / 2, x - SW / 2) / TAU + .5) * 2.999); }            // three sectors
+  return { n, cell, dn, grp, h, ph, cc: new Float32Array(n) }; }
+function hexCentres(cs, jit, seed) { const out = []; for (let row = 0, y = -cs; y <= SH + cs; y += cs * .866, row++) for (let x = -cs + (row % 2) * cs / 2; x <= SW + cs; x += cs)
+  out.push([x + (hash(row, Math.round(x), seed) - .5) * cs * jit, y + (hash(row, Math.round(x), seed + 1) - .5) * cs * jit]); return out; }
+function gridCentres(cs) { const out = []; for (let y = cs / 2; y < SH + cs; y += cs) for (let x = cs / 2; x < SW + cs; x += cs) out.push([x + (hash(x, y, 85) - .5) * cs * .2, y + (hash(x, y, 86) - .5) * cs * .2]); return out; }
+function ringCentres(step) { const out = [[SW / 2, SH / 2]]; for (let k = 1; k * step < 1180; k++) { const r = k * step, n = Math.round(TAU * r / step);
+  for (let q = 0; q < n; q++) { const a = (q + (k % 2) * .5) / n * TAU; out.push([SW / 2 + Math.cos(a) * r, SH / 2 + Math.sin(a) * r]); } } return out; }
+const LATS = [lattice(hexCentres(48, .36, 81)), lattice(gridCentres(56)), lattice(hexCentres(76, .3, 91)), lattice(ringCentres(62))];
+
+// ---------- the scenes: each gives a cell its density k (0..1) and sets HUE (0 cyan · 1 steel · 2 gold · 3 white · 4 pink · 5 violet) ----------
+let HUE = 1;
+const nodal = (f, sharp) => { const v = 1 - Math.min(1, Math.abs(f) * sharp); return v * v; };
+const QC = new Float32Array(8), QSN = new Float32Array(8), QP = new Float32Array(8), SRC = new Float32Array(40), ATT = new Float32Array(NCELL);
+const AY = [-.12, .3, .62, -.5, .82], AH = [0, 1, 2, 4, 5];
+function prepQuasi(S, k0) { S.N = S.m; S.K = k0 + 2.2 * S.n; const rot = S.b * .03;
+  for (let j = 0; j < S.N; j++) { const th = j * PI / S.N + rot; QC[j] = Math.cos(th); QSN[j] = Math.sin(th); QP[j] = S.t * (.5 + .17 * j) * (j % 2 ? 1 : -1); }
+  S.qn = 1.5 / Math.sqrt(S.N); }
+function fQuasi(i, S) { const x = U[i], y = V[i]; let f = 0; for (let j = 0; j < S.N; j++) f += Math.cos(S.K * (x * QC[j] + y * QSN[j]) + QP[j]);
+  HUE = S.hue + .9 * (.5 + .5 * Math.cos(S.K * .35 * R[i] - S.t * 1.2)); return nodal(f * S.qn, S.sharp); }
+function prepJulia(S, s) { const st = Math.floor(S.b * 16) % 16, env = Math.exp(-fr(S.b * 16) * 3), acid = S.acid * (ACID[st] - 12) / 12 * env;
+  const phi = S.b * .33 + 1.1 + .5 * acid; S.jcx = .66 + .17 * Math.cos(phi); S.jcy = .54 + .17 * Math.sin(phi * .7);
+  S.jz = (.8 - .05 * s.kick - .08 * s.drop + .05 * acid) * (1 + .1 * Math.sin(S.b * PI / 8)); S.wedge = TAU / S.m; S.jrot = S.b * .06; S.hq = S.t * .9; }
+// a Kali set: z -> |z| / (z.z) - c, seven times (more and the detail falls below one glyph); the picture is where the orbit passes closest to an axis and to the origin
+function fJulia(i, S) { const w = S.wedge; let a = A[i] + S.jrot; a = ((a % w) + w) % w; if (a > w / 2) a = w - a;
+  const r = R[i] * S.jz + .05; let zx = r * Math.cos(a), zy = r * Math.sin(a), m1 = 9, m2 = 9, at = 0;
+  for (let n = 0; n < 7; n++) { const d = zx * zx + zy * zy + 1e-6; zx = Math.abs(zx) / d - S.jcx; zy = Math.abs(zy) / d - S.jcy;
+    const ax = Math.abs(zx); if (ax < m1) { m1 = ax; at = n; } const q = zx * zx + zy * zy; if (q < m2) m2 = q; }
+  const line = 1 - Math.min(1, m1 * S.jsharp), glow = Math.max(0, Math.exp(-m2 * 9) - .35);
+  HUE = S.jh0 + S.jh1 * (.5 + .5 * Math.sin(at * .9 + S.hq)) ; return Math.min(1, Math.max(0, line * line + .9 * glow - S.jfloor) * 1.35); }
+const SCENES = {
+  // standing waves of a rectangular plate (the album video's circle, opened out to the whole frame)
+  plate: { prep(S, s) { S.hue = 1 + s.warm; S.dx = .04 * Math.sin(S.t * .21); },
+    f(i, S) { const x = U[i] / 1.7778 + S.dx + .012 * Math.sin(V[i] * 5 + S.t * .7), y = V[i] + .012 * Math.cos(U[i] * 4 - S.t * .6), n = S.n, m = S.m + 1;
+      const f = Math.cos(n * PI * x) * Math.cos(m * PI * y) - Math.cos(m * PI * x) * Math.cos(n * PI * y);
+      HUE = S.hue + .6 * S.L * (.5 + .5 * Math.cos((x + y) * 3 + S.t * .4)); return nodal(f * .8, S.sharp) * (1 - .12 * R[i]); } },
+  quasi: { prep(S, s) { S.hue = 1 + s.warm; prepQuasi(S, 9); }, f: fQuasi },
+  // aurora: curtains hanging from a wandering lower edge, rays running up them
+  aurora: { prep(S, s) { S.nc = S.b >= 48 && S.b < 56 ? 5 : S.b >= 112 ? 2 : 3; S.aw = (.75 + .5 * S.E + .3 * s.warm) * (S.nc === 5 ? .8 : 1); S.atail = S.nc === 5 ? .2 : .32; S.warm = s.warm; },
+    f(i, S) { const x = U[i], y = V[i]; let k = 0, best = 0, hue = 1;
+      for (let c = 0; c < S.nc; c++) { const yc = AY[c] + .55 * (vnoise(x * .7 + c * 7.3 + S.t * .04, S.t * .1 + c * 3.1) - .5) + .08 * Math.sin(x * 2.3 + S.t * .5 + c * 2);
+        const d = y - yc, ray = (.2 + .8 * vnoise(x * 6 + c * 13 + .8 * Math.sin(S.t * .2 + c), y * 1.1 + c * 5 - S.t * .2)) * (.72 + .28 * vnoise(x * 21 + c * 3, S.t * .3 + c * 2));
+        const g = (d < 0 ? Math.exp(d / S.atail) * ray * ray * 1.5 : Math.exp(-(d * d) / .004)) * .95 * S.aw;
+        k += g; if (g > best) { best = g; hue = AH[c]; } }
+      HUE = lerp(hue, 2, S.warm * .6); return Math.min(1, Math.max(0, k - .16) * 1.2); } },
+  // the build: a tunnel, faster every bar
+  tunnel: { prep(S, s) { const q = S.b - 56; S.tk = 5 + 1.6 * S.n; S.tph = TAU * (1.2 * q + .3 * q * q); S.tw = .6 * Math.sin(S.b * PI / 4); S.hue = 1 + s.roll; S.rot = S.b * .1; },
+    f(i, S) { const r = R[i] + .02, lr = Math.log(r), f = Math.cos(S.tk * lr - S.tph) * Math.cos(S.m * (A[i] + S.tw * lr) + S.rot);
+      HUE = S.hue + 1.1 * clamp(1 - r); return nodal(f, S.sharp) * clamp(r * 3.5); } },
+  // drop 1: wave sources interfering. The kick sits at the centre, two more orbit, and every vocal stab drops a new one in.
+  waves: { prep(S, s) { let n = 0; const add = (x, y, a, ph) => { SRC[n * 4] = x; SRC[n * 4 + 1] = y; SRC[n * 4 + 2] = a; SRC[n * 4 + 3] = ph; n++; };
+      const w = TAU * S.b * 4; add(0, 0, 1, w);
+      add(1.1 * Math.cos(S.b * TAU / 8), .55 * Math.sin(S.b * TAU / 4), .8, w * .5); add(-1.1 * Math.cos(S.b * TAU / 8 + .6), -.55 * Math.sin(S.b * TAU / 4 + .9), .8, w * .5 + 1);
+      for (const [age, seed, g] of s.chops) if (n < 9) add((hash(seed, 31) - .5) * 3, (hash(seed, 32) - .5) * 1.6, 1.5 * g * Math.exp(-age * .22), w + seed);
+      S.srcN = n; S.K = 26; S.hue = 1 + s.warm; },
+    f(i, S) { const x = U[i], y = V[i]; let f = 0, aw = 0, dm = 9;
+      for (let q = 0; q < S.srcN; q++) { const d = Math.hypot(x - SRC[q * 4], y - SRC[q * 4 + 1]), a = SRC[q * 4 + 2]; f += a * Math.cos(S.K * d - SRC[q * 4 + 3]); aw += a; if (d < dm && a > .3) dm = d; }
+      HUE = S.hue + 1.4 * Math.exp(-dm * 2.6) - .9 * clamp(dm - .9); return nodal(f / aw * 1.6, S.sharp); } },
+  // breakdown II: a de Jong attractor, x' = sin(a y) - cos(b x), y' = sin(c x) - cos(d y), its parameters adrift
+  attractor: { prep(S, s) { const q = (S.b - 80) * TAU / 8, a = -2 + .09 * Math.sin(q), bb = -2 + .09 * Math.cos(q), c = -1.2 + .14 * Math.sin(2 * q + 1), d = 2 + .08 * Math.cos(q * .5);   // a small orbit round a set that never collapses (wider ones did, at bars 83 and 87)
+      ATT.fill(0); let x = .1, y = .1; const sxk = .82 / 1.7778 * .5 * COLS, syk = .46 * .5 * ROWS;
+      for (let n = 0; n < 260000; n++) { const nx = Math.sin(a * y) - Math.cos(bb * x), ny = Math.sin(c * x) - Math.cos(d * y); x = nx; y = ny;
+        const col = (COLS / 2 + x * sxk) | 0, row = (ROWS / 2 + y * syk) | 0; if (col >= 0 && col < COLS && row >= 0 && row < ROWS) ATT[row * COLS + col]++; }
+      S.attN = (.3 + .25 * s.stab) * (1 + .5 * S.E); },
+    f(i, S) { const k = Math.min(1, Math.log(1 + ATT[i]) * S.attN); HUE = 2 + .9 * k; return k; } },
+  // drop 2: the Julia set of z^2 + c, folded into the chord's symmetry; c walks a circle and the 303 line kicks it along
+  julia: { prep(S, s) { S.acid = 1; S.jh0 = 2.9; S.jh1 = 2.1; S.jsharp = 11; S.jfloor = .24; prepJulia(S, s); }, f: fJulia },
+  peak: { prep(S, s) { S.acid = .7; S.jh0 = 2; S.jh1 = 2.4; S.jsharp = 13; S.jfloor = .26; prepJulia(S, s); S.hue = 2; prepQuasi(S, 7); },
+    f(i, S) { const kj = fJulia(i, S), hj = HUE, kq = fQuasi(i, S) * .7; if (kj >= kq) { HUE = hj; return kj; } HUE = 2 + .8 * kq; return kq; } },
+};
+const SCENE_OF = { air: 'plate', bloom: 'plate', pulse: 'plate', groove: 'quasi', breakdown: 'aurora', build: 'tunnel', drop1: 'waves', breakdown2: 'attractor', drop2: 'julia', peak: 'peak', ringout: 'aurora' };
+const sceneAt = (b) => SCENES[b >= 112 && b < 136 ? (b < 120 ? 'quasi' : 'aurora') : SCENE_OF[sec(b)[2]]];
+const HATCH_HUE = { breakdown: .6, drop2: 4.6, peak: 3, breakdown2: 2.3 };
+
+const titleAlpha = (b) => ease(b / 1.5) * (1 - ease((b - 6) / 2));
+const S = {};
+function frame(b) {
+  const s = song(b), spec = spectrum(b), still = silent(b), cs = cells(b), name = sec(b)[2], scene = sceneAt(b);
+  const t = b * 240 / BPM; let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;
+  const fadeFig = 1 - ease((b - 133.5) / 2.5), fadeAll = (1 - .85 * ease((b - 136.6) / 1.4)) * (b < 1 ? .25 + .75 * ease(b) : 1), ta = titleAlpha(b);
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, SW, SH);
+  S.b = b; S.t = t; S.E = E; S.L = s.L; S.sharp = 1.6 + 2.6 * s.L; S.n = rings(b); S.m = SPOKES[s.ci]; S.hue = 1 + s.warm;
+  if (!still) scene.prep(S, s);
+  // the cells of this transition: which lattice, which order of booms (the dissolve already wears the next chord's lattice)
+  const chord = Math.floor(b / 2), ti = cs.p >= 6.5 ? chord + 1 : chord, lat = LATS[Math.floor(hash(ti, 71) * LATS.length)], grp = lat.grp[Math.floor(hash(ti, 72) * 4)], CC = lat.cc, p = cs.p;
+  for (let q = 0; q < lat.n; q++) { const g = grp[q]; CC[q] = still ? 0 : p < 3 ? (p < g ? 1 : 1 - ease((p - g) / .15)) : p >= 6.5 ? ease((p - 6.6 - .6 * lat.h[q]) / .3) : 0; }
+  // the hatching underneath: drifts with the music's energy, sways, and rings run out from the centre on kicks and booms
+  const ft = fieldTime(b), fa = (.27 + .13 * s.kick + .14 * s.drop + .05 * s.roll + .08 * s.chop + .06 * cs.bm + .09 * s.stab) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fadeAll;
+  const kAge = fr(b * 4), kStr = still ? 0 : kickOn(b) * (1 - kAge) * .5 * Math.min(1, kAge * 12), kR = .08 + 2.1 * kAge, bAge = fr(p), bStr = still || p >= 3 ? 0 : cs.bm * .9 * (1 - bAge), bR = .08 + 2.3 * bAge;
+  const sway = still ? 0 : 1.5 + 5 * E, hrow = Math.round((HATCH_HUE[name] ?? 2) * HSTEP);
+  const jmag = still ? 0 : 5 * s.kick + 9 * cs.bm + 14 * s.drop + 4 * s.chop + 3 * s.stab + 3 * s.roll * (1 + Math.sin(b * TAU * 8) * .5), push = still ? 0 : 12 * cs.bm + 8 * s.stab;
+  const beat16 = Math.floor(b * 16), gsh = kickOn(b) ? 0 : 2, notes = s.notes, nn = notes.length, mem0 = .64, stabUp = 1 + .7 * s.stab + .5 * s.drop;
+  // each bell note's place: pitch across the frame, a slow wave up and down
+  const NX = [], NY = []; for (let q = 0; q < nn; q++) { NX.push((notes[q][1] - 74) / 9 * 1.35 * (notes[q][1] > 84 ? .6 : 1)); NY.push(.55 * Math.sin(notes[q][1] * 2.1)); }
+  let nfig = 0, nhatch = 0, tInk = 0; const tfull = ease(ta * 1.7);   // the title's ground clears before the title is fully up
+  for (let i = 0; i < NCELL; i++) {
+    const q = lat.cell[i], cc = CC[q]; let k = 0, hue = S.hue, dot = -1;
+    if (still) k = FLATK[i];
+    else {
+      if (cc < 1 && H7[i] <= s.amt) { k = scene.f(i, S) * fadeFig * stabUp; if (k > 1) k = 1; hue = HUE + .8 * s.stab; }
+      if (cc > 0) { const dn = lat.dn[i], mem = mem0 + .07 * Math.sin(t * 4 + lat.ph[q]) - .1 * s.chop; let kc = 0, part = 0;
+        if (dn < .22) { kc = .95; part = 2; } else if (Math.abs(dn - mem) < .075) { kc = .78; part = 1; } else if (H61[i] < .2) kc = .3;
+        k += (kc * fadeFig - k) * cc; if (cc > .5) dot = kc > 0 ? part : -2; }
+    }
+    for (let n = 0; n < nn; n++) { const age = notes[n][0], d = Math.abs(Math.hypot(U[i] - NX[n], V[i] - NY[n]) - age * .75), w = .028 + .012 * (notes[n][1] % 3);
+      if (d < w) { const kr = (1 - d / w) * (1 - age / 2) * .85 * notes[n][2]; if (kr > k) { k = kr; hue = 3; dot = -1; } } }
+    if (dot === -2) k = 0;
+    const tsup = 1 - tfull * TMASK[i], px = PX[i], py = PY[i];
+    if (k >= .14) {
+      k *= .7 + .5 * spec[BAND[i]];
+      if (hash(i, beat16, 5) > .985 && !still) k = Math.min(1, k + .35);                    // a glint here and there on the 16ths
+      const lv = Math.min(SRAMP.length - 1, Math.pow(k, .8) * SRAMP.length | 0), set = SRAMP[lv];
+      const gi = dot >= 0 ? DOT + dot : SSTART[lv] + (hash(i, still ? 0 : beat16 >> gsh) * set.length | 0);
+      const row = clamp(Math.round(hue * HSTEP), 0, NC - 1), al = clamp(.42 + .7 * k) * fadeAll * tsup;
+      const r = R[i] + .001, dx = JC[i] * jmag + U[i] / r * push * (.3 + r), dy = JS[i] * jmag + V[i] / r * push * (.3 + r);
+      cx.globalAlpha = al; cx.drawImage(atlas, gi * TW, row * TH, TW, TH, px - 5 + dx, py - 6 + dy, TW, TH);
+      nfig++; if (INTITLE[i] && al > tInk) tInk = al;
+    } else {
+      const d = R[i], ring = kStr * Math.exp(-(((d - kR) / .07) ** 2)) + bStr * Math.exp(-(((d - bR) / .09) ** 2));
+      let v = hatchField(XC[i] + Math.sin(YR[i] * .09 + ft * 1.7) * sway, YR[i], ft) + ring; v = v * 1.35 - .05 + BAY[i];
+      if (HSKIP[i]) continue;
+      const g = v >= 1 ? 6 : Math.floor(v * 8) - 1; if (g < 0) continue;
+      const al = Math.min(1, fa * (1 + 1.6 * ring)) * tsup; cx.globalAlpha = al; cx.drawImage(atlas, (HAT + g) * TW, hrow * TH, TW, TH, px - 5, py - 6, TW, TH);
+      nhatch++; if (INTITLE[i] && al > tInk) tInk = al;
+    }
+  }
+  window.viz.stats = { fig: nfig / NCELL, hatch: nhatch / NCELL, titleInk: tInk, ta };
+  if (ta > 0) { cx.globalAlpha = ta * .9; cx.fillStyle = '#e6d6ad'; cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';
+    cx.font = '700 56px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('A U R A', TITLE.x, TITLE.y);
+    cx.globalAlpha = ta * .6; cx.font = '400 22px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('Bvby Ash', TITLE.x + 4, TITLE.y + 40); }
+  cx.globalAlpha = 1;
+}
+
+// ---------- layout check: run viz.check() in the console, or tools/viz/check_layout.mjs aura-festival ----------
+// Every quarter bar the page draws the frame and counts what actually landed on the canvas: the figure must be there (not an
+// empty frame, the defect the album cover's first render had) and must not fill the frame solid; the glyph grid must stay on
+// screen to the end; and while the title shows, no glyph may be painted under it.
+function check(step = 1 / 4) { const bad = [], say = (b, m) => { if (bad.length < 40) bad.push(`bar ${(b + 1).toFixed(2)}: ${m}`); };
+  if (TITLE.x < 8 || TITLE.y + 44 > SH - 8) say(0, 'the title leaves the frame');
+  for (let b = 0; b < BARS; b += step) { frame(b); const st = window.viz.stats, pct = (v) => (v * 100).toFixed(1) + '%';
+    if (b >= 1 && b < 130 && !silent(b) && st.fig < .012) say(b, `the figure is missing (${pct(st.fig)} of the grid lit)`);
+    if (st.fig > .62) say(b, `the figure fills the frame solid (${pct(st.fig)})`);
+    if (b >= 1 && b < 137 && st.fig + st.hatch < .06) say(b, `the glyph grid has left the screen (${pct(st.fig + st.hatch)} drawn)`);
+    if (st.ta > .6 && st.titleInk > .2) say(b, `glyphs are painted under the title (alpha ${st.titleInk.toFixed(2)})`); }
+  return bad; }
+
+// ---------- clocks: ?bar=N holds one frame; otherwise the master plays and the picture follows its time ----------
+const go = document.getElementById('go');
+window.viz = { BPM, BARS, TAIL, frame, song, cells, check, stats: null, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: false };
+fetch('aura-festival-spectrum.json').then((r) => r.json()).then((j) => {
+    SPEC = { fps: j.fps, frames: j.frames, d: Uint8Array.from(atob(j.data), (ch) => ch.charCodeAt(0)) };
+    CUM = new Float32Array(SPEC.frames); for (let i = 1; i < SPEC.frames; i++) { const b = (i / SPEC.fps - OFF) * BPM / 240;
+      CUM[i] = CUM[i - 1] + (silent(b) ? 0 : (.8 + 4.5 * energy(i)) / SPEC.fps); } })
+  .catch((e) => console.error('no spectrum file: the field will not follow the music', e))
+  .finally(() => {
+    window.viz.ready = true;
+    if (QS.has('bar')) { go.remove(); frame(+QS.get('bar')); return; }
+    frame(30);
+    go.onclick = () => {
+      go.remove();
+      const audio = new Audio(QS.get('audio') || '/renders/aura-festival-r1-master.mp3'); window.viz.audio = audio;
+      const from = +QS.get('from') || 0; let t0 = null;
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM + OFF; audio.play(); });
+      audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });
+      const loop = (t) => { const sx = t0 === null ? audio.currentTime - OFF : (t - t0) / 1000; frame(Math.min(sx * BPM / 240, BARS - .001)); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    };
+  });
+</script>
+</body>
+</html>
