@@ -31,7 +31,8 @@
 //   drop 2              a kaleidoscopic Julia set folded to the chord's symmetry; the 303 line steers its constant
 //   peak                the Julia set and the quasicrystal together, the bell an octave up ringing white over both
 //   outro, ring-out     the quasicrystal calms, the aurora returns and thins, the hatching is the last thing left
-//   between every chord the figure dissolves into cells of dots (four lattices, four boom orders), then boom, boom, boom
+//   between every chord the figure clears, cell by cell (four lattices), to the hatching alone for a moment; then boom, boom,
+//   boom: each boom brings a third of the cells back as the new figure (four orders)
 const BPM = 128, BARS = 138, TAIL = 0;
 const QS = new URLSearchParams(location.search), OFF = 0;             // the master starts on bar 1 (lag vs premaster within 0.12 ms)
 const BG = '#14171b';
@@ -87,8 +88,8 @@ function song(b) {
   for (const [a] of SILENT) if (b >= a && b < a + 1) s.notes.push([b - a, 74, 1]);   // the thrown stab ripples across the flat field
   return s;
 }
-// the transition between figures: p = beats into this 2-bar chord. Cells of dots form over the last beat and a half; three
-// booms on beats 1, 2, 3 of the next chord each snap a third of the cells into the new figure. bm = the boom's impulse.
+// the transition between figures: p = beats into this 2-bar chord. The figure clears over the last three quarters of a beat;
+// three booms on beats 1, 2, 3 of the next chord each bring a third of the cells back. bm = the boom's impulse.
 function cells(b) { const c0 = Math.floor(b / 2) * 2, p = (b - c0) * 4; let bm = 0;
   if (p < 3) bm = Math.exp(-fr(p) * 9);
   const soft = kickOn(b) || within(b, 56, 112) ? 1 : .55;             // no drums: softer booms
@@ -209,12 +210,13 @@ const SCENES = {
       for (let q = 0; q < S.srcN; q++) { const d = Math.hypot(x - SRC[q * 4], y - SRC[q * 4 + 1]), a = SRC[q * 4 + 2]; f += a * Math.cos(S.K * d - SRC[q * 4 + 3]); aw += a; if (d < dm && a > .3) dm = d; }
       HUE = S.hue + 1.4 * Math.exp(-dm * 2.6) - .9 * clamp(dm - .9); return nodal(f / aw * 1.6, S.sharp); } },
   // breakdown II: a de Jong attractor, x' = sin(a y) - cos(b x), y' = sin(c x) - cos(d y), its parameters adrift
-  attractor: { prep(S, s) { const q = (S.b - 80) * TAU / 8, a = -2 + .09 * Math.sin(q), bb = -2 + .09 * Math.cos(q), c = -1.2 + .14 * Math.sin(2 * q + 1), d = 2 + .08 * Math.cos(q * .5);   // a small orbit round a set that never collapses (wider ones did, at bars 83 and 87)
+  attractor: { prep(S, s) { const q = (S.b - 80) * TAU / 8, a = -2.245 + .061 * Math.sin(q + .17), bb = -1.734 + .096 * Math.sin(q + 5.35), c = -1.47 + .03 * Math.sin(2 * q + .3), d = 2.164 + .07 * Math.sin(q + .76);
+      // (this loop was searched for: 400 candidate loops, kept the one whose attractor never thins below 16% of the grid at 1,024 steps; wider and hand-picked loops collapsed at bars 83, 85 and 87)
       ATT.fill(0); let x = .1, y = .1; const sxk = .82 / 1.7778 * .5 * COLS, syk = .46 * .5 * ROWS;
       for (let n = 0; n < 260000; n++) { const nx = Math.sin(a * y) - Math.cos(bb * x), ny = Math.sin(c * x) - Math.cos(d * y); x = nx; y = ny;
         const col = (COLS / 2 + x * sxk) | 0, row = (ROWS / 2 + y * syk) | 0; if (col >= 0 && col < COLS && row >= 0 && row < ROWS) ATT[row * COLS + col]++; }
       S.attN = (.3 + .25 * s.stab) * (1 + .5 * S.E); },
-    f(i, S) { const k = Math.min(1, Math.log(1 + ATT[i]) * S.attN); HUE = 2 + .9 * k; return k; } },
+    f(i, S) { const k = Math.min(1, Math.max(0, Math.log(1 + ATT[i]) * S.attN - .3) * 1.4); HUE = 2 + .9 * k; return k; } },
   // drop 2: the Julia set of z^2 + c, folded into the chord's symmetry; c walks a circle and the 303 line kicks it along
   julia: { prep(S, s) { S.acid = 1; S.jh0 = 2.9; S.jh1 = 2.1; S.jsharp = 11; S.jfloor = .24; prepJulia(S, s); }, f: fJulia },
   peak: { prep(S, s) { S.acid = .7; S.jh0 = 2; S.jh1 = 2.4; S.jsharp = 13; S.jfloor = .26; prepJulia(S, s); S.hue = 2; prepQuasi(S, 7); },
@@ -234,8 +236,8 @@ function frame(b) {
   S.b = b; S.t = t; S.E = E; S.L = s.L; S.sharp = 1.6 + 2.6 * s.L; S.n = rings(b); S.m = SPOKES[s.ci]; S.hue = 1 + s.warm;
   if (!still) scene.prep(S, s);
   // the cells of this transition: which lattice, which order of booms (the dissolve already wears the next chord's lattice)
-  const chord = Math.floor(b / 2), ti = cs.p >= 6.5 ? chord + 1 : chord, lat = LATS[Math.floor(hash(ti, 71) * LATS.length)], grp = lat.grp[Math.floor(hash(ti, 72) * 4)], CC = lat.cc, p = cs.p;
-  for (let q = 0; q < lat.n; q++) { const g = grp[q]; CC[q] = still ? 0 : p < 3 ? (p < g ? 1 : 1 - ease((p - g) / .15)) : p >= 6.5 ? ease((p - 6.6 - .6 * lat.h[q]) / .3) : 0; }
+  const chord = Math.floor(b / 2), ti = cs.p >= 7.2 ? chord + 1 : chord, lat = LATS[Math.floor(hash(ti, 71) * LATS.length)], grp = lat.grp[scene === SCENES.attractor ? 0 : Math.floor(hash(ti, 72) * 4)]   /* the attractor sits off-centre: a sweep's first boom showed an empty third (bar 85), so its booms are scattered */, CC = lat.cc, p = cs.p;
+  for (let q = 0; q < lat.n; q++) { const g = grp[q]; CC[q] = still ? 0 : p < 3 ? (p < g ? 1 : 1 - ease((p - g) / .15)) : p >= 7.2 ? ease((p - 7.25 - .45 * lat.h[q]) / .25) : 0; }
   // the hatching underneath: drifts with the music's energy, sways, and rings run out from the centre on kicks and booms
   const ft = fieldTime(b), fa = (.27 + .13 * s.kick + .14 * s.drop + .05 * s.roll + .08 * s.chop + .06 * cs.bm + .09 * s.stab) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fadeAll;
   const kAge = fr(b * 4), kStr = still ? 0 : kickOn(b) * (1 - kAge) * .5 * Math.min(1, kAge * 12), kR = .08 + 2.1 * kAge, bAge = fr(p), bStr = still || p >= 3 ? 0 : cs.bm * .9 * (1 - bAge), bR = .08 + 2.3 * bAge;
@@ -250,13 +252,11 @@ function frame(b) {
     if (still) k = FLATK[i];
     else {
       if (cc < 1 && H7[i] <= s.amt) { k = scene.f(i, S) * fadeFig * stabUp; if (k > 1) k = 1; hue = HUE + .8 * s.stab; }
-      if (cc > 0) { const dn = lat.dn[i], mem = mem0 + .07 * Math.sin(t * 4 + lat.ph[q]) - .1 * s.chop; let kc = 0, part = 0;
-        if (dn < .22) { kc = .95; part = 2; } else if (Math.abs(dn - mem) < .075) { kc = .78; part = 1; } else if (H61[i] < .2) kc = .3;
-        k += (kc * fadeFig - k) * cc; if (cc > .5) dot = kc > 0 ? part : -2; }
+      // between figures the cell clears to the hatching (Joona: "remove those small circles"), and the booms bring the new figure in
+      if (cc > 0) k *= 1 - cc;
     }
     for (let n = 0; n < nn; n++) { const age = notes[n][0], d = Math.abs(Math.hypot(U[i] - NX[n], V[i] - NY[n]) - age * .75), w = .028 + .012 * (notes[n][1] % 3);
       if (d < w) { const kr = (1 - d / w) * (1 - age / 2) * .85 * notes[n][2]; if (kr > k) { k = kr; hue = 3; dot = -1; } } }
-    if (dot === -2) k = 0;
     const tsup = 1 - tfull * TMASK[i], px = PX[i], py = PY[i];
     if (k >= .14) {
       k *= .7 + .5 * spec[BAND[i]];
@@ -290,7 +290,8 @@ function frame(b) {
 function check(step = 1 / 4) { const bad = [], say = (b, m) => { if (bad.length < 40) bad.push(`bar ${(b + 1).toFixed(2)}: ${m}`); };
   if (TITLE.x < 8 || TITLE.y + 44 > SH - 8) say(0, 'the title leaves the frame');
   for (let b = 0; b < BARS; b += step) { frame(b); const st = window.viz.stats, pct = (v) => (v * 100).toFixed(1) + '%';
-    if (b >= 1 && b < 130 && !silent(b) && st.fig < .012) say(b, `the figure is missing (${pct(st.fig)} of the grid lit)`);
+    const p = fr(b / 2) * 8, turning = p < .25 || p > 7.2;   // the figure is meant to be away for the turn between chords
+    if (b >= 1 && b < 130 && !silent(b) && !turning && st.fig < .012) say(b, `the figure is missing (${pct(st.fig)} of the grid lit)`);
     if (st.fig > .62) say(b, `the figure fills the frame solid (${pct(st.fig)})`);
     if (b >= 1 && b < 137 && st.fig + st.hatch < .06) say(b, `the glyph grid has left the screen (${pct(st.fig + st.hatch)} drawn)`);
     if (st.ta > .6 && st.titleInk > .2) say(b, `glyphs are painted under the title (alpha ${st.titleInk.toFixed(2)})`); }
