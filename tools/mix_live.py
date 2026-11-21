@@ -16,7 +16,7 @@ ap.add_argument("--bpm", type=float, required=True); ap.add_argument("--bars", t
 ap.add_argument("--first-kick-bar", type=int, required=True, help="1-based bar of the first kick")
 ap.add_argument("--allow-silent", default="", help="comma list of stems allowed to be silent (a section preview with no drums); never for a full track")
 ap.add_argument("--music-hp", type=float, default=170, help="high-pass on the music bus in Hz; lower it for a low arp (Aura B: 80)")
-ap.add_argument("--rate", type=int, default=44100); ap.add_argument("--tail-bars", type=float, default=1.5)
+ap.add_argument("--rate", type=int, default=44100); ap.add_argument("--tail-bars", type=float, default=0.0)   # 0: the song ends on its last bar. The page LOOPS the arrangement, so any tail is bar 1 again (BUG-019); give the song its own ring-out bars instead
 a = ap.parse_args()
 LAY = {"master": (0, 2), "kick": (2, 1), "drums": (3, 2), "music": (5, 2), "bass": (7, 1), "bell": (8, 2), "other": (10, 2)}
 RAW, OUT, SR, N, BAR = a.raw, a.out, a.rate, sum(c for _, c in LAY.values()), 240.0 / a.bpm
@@ -93,11 +93,16 @@ graph = ";".join([
     st("other", "highpass=f=120"),                   # pads and vocals on orbits 5-8
     "[drumbus][bass][music][bell][other]amix=inputs=5:normalize=0,"
     "acompressor=threshold=-15dB:ratio=1.5:attack=30:release=220:knee=6:makeup=1,"
-    f"afade=t=in:st=0:d=0.01,afade=t=out:st={a.bars * BAR:.2f}:d={a.tail_bars * BAR:.2f}:curve=qsin[mix]",   # only the delay tail fades
+    f"afade=t=in:st=0:d=0.01,afade=t=out:st={a.bars * BAR + min(0, a.tail_bars * BAR - .05):.3f}:d={max(.05, a.tail_bars * BAR):.3f}:curve=qsin[mix]",   # a tail fades; with no tail, a 50 ms fade on the last bar
 ])
 src = ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", str(N), "-ss", f"{t0:.4f}", "-t", f"{dur - lead_ms / 1000:.3f}", "-i", RAW]
 premix = OUT + "-premaster.wav"
 subprocess.run(src + ["-filter_complex", graph, "-map", "[mix]", "-c:a", "pcm_f32le", premix], check=True)
+# the loop-restart guard (BUG-019): a song's last second must not come back up after its tail has died away
+_end = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-4", "-i", premix, "-ac", "1", "-f", "f32le", "-"], capture_output=True).stdout, np.float32).astype(np.float64)
+_sec = [db(np.sqrt((_end[i * SR:(i + 1) * SR] ** 2).mean())) for i in range(len(_end) // SR)]
+if len(_sec) >= 2 and min(_sec[:-1]) < -40 and _sec[-1] > min(_sec[:-1]) + 15:
+    sys.exit(f"the ending comes back up after dying away (last seconds {[round(v) for v in _sec]} dBFS): the capture's loop restart is in the master; check --bars / --tail-bars")
 subprocess.run(src + ["-af", f"adelay={lead_ms:.1f}:all=1,pan=stereo|c0=c0|c1=c1", "-c:a", "pcm_f32le", OUT + "-asplayed.wav"], check=True)
 
 def measure(path):
