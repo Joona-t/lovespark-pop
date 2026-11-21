@@ -20,8 +20,10 @@
 // Aura (Festival Version) · neurons, grown in glyphs. Joona: "have it be neurons growing by bits that you are coding with the
 // syntax and you can do it at a rapid pace so it matches the synths", then, on the first take (branches as lines of text):
 // "in our last video style thats how i want them build glyph grid style and no circular pulsing light".
-// Neurons grow across the last video's fine grid (320 x 120 glyph cells). A branch is a tapering band of glyphs shaded by
-// density, fine grain at its edge and code glyphs ({ } < > / 0 1 @) along its core; the cell body is a dense knot of them.
+// then: "good but have them be more intricate look up neuronal structures" (with a picture of three neurons).
+// Neurons grow across the last video's fine grid (320 x 120 glyph cells): a cell body with its nucleus, dendrites forking
+// down to twigs and studded with spines, a myelinated axon reaching to the next neuron. Every part is glyphs shaded by
+// density, fine grain at an edge and code glyphs ({ } < > / 0 1 @) along a core.
 // The growth comes in a burst on every 16th note, the arps' own rhythm, at a rate set by the section, with a white-hot tip
 // on every growing branch. A network lives for 4 or 8 bars, then is eaten back from its tips while the next one grows over
 // it. On every kick a spike runs out from each cell body along its branches; bell notes fire single neurons; the vocal stabs
@@ -30,7 +32,7 @@
 // frame only decides how much of each is grown so far.
 const BPM = 128, BARS = 138, TAIL = 0;
 const QS = new URLSearchParams(location.search), OFF = 0;
-const BG = '#13161a';
+const BG = '#12142a';                                                  // deep indigo, as in Joona's reference picture of neurons
 const SW = 1920, SH = 1080, GW = 6, GH = 9, COLS = SW / GW, ROWS = SH / GH, NCELL = COLS * ROWS;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 const PI = Math.PI, TAU = PI * 2, fr = (v) => v - Math.floor(v);
@@ -83,9 +85,9 @@ const SRAMP = ['.', '·:', ':;', "-'", '=+', '*+', '#x', '%&', '0{}', '1<>/@'];
 const GLY = []; SRAMP.forEach((set) => [...set].forEach((ch) => GLY.push(ch)));
 const SSTART = []; { let n = 0; SRAMP.forEach((set) => { SSTART.push(n); n += set.length; }); }
 const HAT = GLY.length; HRAMP.forEach((ch) => GLY.push(ch));
-// the palette: cyan · steel · gold · white · pink · violet
-const ANCH = [[112, 214, 232], [207, 216, 224], [233, 201, 160], [255, 246, 232], [255, 118, 170], [158, 136, 255]], HSTEP = 8, NC = (ANCH.length - 1) * HSTEP + 1;
-const NETHUE = [1, 2, 0, 4.6, 1.6, 4];          // a network's own colour, in turn: steel, gold, cyan, pink-violet, warm steel, pink
+// the palette: cyan · steel · gold · white · pink · violet · orange (the myelin)
+const ANCH = [[112, 214, 232], [207, 216, 224], [233, 201, 160], [255, 246, 232], [255, 118, 170], [158, 136, 255], [240, 152, 70]], HSTEP = 8, NC = (ANCH.length - 1) * HSTEP + 1;
+const BRANCH_HUE = [1, .55, 5, 4.6, 1, 5, 4.2, .8];   // a dendrite's colour: steel, cyan-steel, violet, pink-violet, pink (a child keeps its parent's, mostly)
 const TW = 10, TH = 12, atlas = document.createElement('canvas'); atlas.width = GLY.length * TW; atlas.height = NC * TH;
 { const a = atlas.getContext('2d'); a.textBaseline = 'middle'; a.textAlign = 'center';
   for (let row = 0; row < NC; row++) { const h = row / HSTEP, i = Math.min(ANCH.length - 2, Math.floor(h)), f = h - i;
@@ -95,38 +97,75 @@ const TW = 10, TH = 12, atlas = document.createElement('canvas'); atlas.width = 
 
 // ---------- the networks: [start bar, end bar, growth rate (steps per tip per 16th), neurons, most tips at once] ----------
 const NETS = [[0, 8, .8, 2, 6], [8, 16, 1.1, 3, 7], [16, 20, 1.5, 4, 9], [20, 24, 1.5, 4, 9], [24, 28, 2, 5, 10], [28, 32, 2, 5, 10], [32, 36, 2, 5, 10], [36, 40, 2, 5, 10],
-  [40, 48, 1.1, 3, 8], [48, 56, 1.5, 4, 9], [56, 63, 2.4, 6, 9], [64, 68, 3, 6, 11], [68, 72, 3, 6, 11], [72, 76, 3, 6, 11], [76, 80, 3, 6, 11], [80, 87, 1.2, 3, 8],
+  [40, 48, 1.4, 3, 8], [48, 56, 1.5, 4, 9], [56, 63, 2.4, 6, 9], [64, 68, 3, 6, 11], [68, 72, 3, 6, 11], [72, 76, 3, 6, 11], [76, 80, 3, 6, 11], [80, 87, 1.2, 3, 8],
   [88, 92, 3.4, 7, 11], [92, 96, 3.4, 7, 11], [96, 100, 3.4, 7, 11], [100, 104, 3.4, 7, 11], [90, 94, 3, 5, 7], [94, 98, 3, 5, 7], [98, 102, 3, 5, 7],   // drop 2: a second network, two bars out of step
   [104, 108, 4, 8, 11], [108, 112, 4, 8, 11], [102, 106, 3.4, 5, 7], [106, 110, 3.4, 5, 7], [112, 120, 1.5, 4, 8], [120, 134, 1, 3, 5]];
-const PRUNE = (n) => (n[1] - n[0] >= 7 ? 1.5 : 1);                  // bars a network takes to be backspaced away once the next has begun
-const STEP = 8.5;                                                    // px a tip grows per step
-// A network is grown once, by simulation: tips leave each cell body, wander, branch, die, and new ones sprout so the growth
-// never stops. Each step stamps a disc of glyph cells; a cell remembers when it was first reached (t) and how deep in the
-// branch it sits (k: 1 on the core, 0 at the edge). Where a tip runs into another branch it stops: a synapse.
-function buildNet(def, id) { const [b0, b1, rate, K, maxTips] = def, ticks = Math.ceil((b1 - b0) * 16 * rate) + 2, slot = new Int32Array(NCELL).fill(-1), core = new Int32Array(NCELL).fill(-1);
-  let hc = 0; const rnd = () => hash(1000 + id, hc++, 17), I = [], Tt = [], Kd = [], Nn = [], tips = [], somas = [];
-  const stamp = (x, y, w, t, n) => { const c0 = Math.max(0, Math.floor((x - w) / GW)), c1 = Math.min(COLS - 1, Math.floor((x + w) / GW)), r0 = Math.max(0, Math.floor((y - w) / GH)), r1 = Math.min(ROWS - 1, Math.floor((y + w) / GH));
-    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const d = Math.hypot(c * GW + GW / 2 - x, r * GH + GH / 2 - y); if (d > w) continue;
-      const k = 1 - d / w, i = r * COLS + c, q = slot[i]; if (q < 0) { slot[i] = I.length; I.push(i); Tt.push(t); Kd.push(k); Nn.push(n); } else if (k > Kd[q]) Kd[q] = k; } };
-  const newTip = (x, y, th, t, n, w) => { tips.push({ x, y, th, n, w, born: t, died: 1e9, last: -1 }); };
+const PRUNE = (n) => (n[0] === 112 ? 3.5 : n[1] - n[0] >= 7 ? 1.5 : 1);   // (the last-but-one lingers while the slow outro network gets going: without it bar 122 was nearly empty)                  // bars a network takes to be backspaced away once the next has begun
+// A network is grown once at load. Anatomy (looked up; sources in BUGS_AND_ITERATIONS.md): an irregular cell body with a
+// nucleus and nucleolus; five to seven dendrites that fork again and again, each fork thinning the daughters by Rall's 3/2
+// rule (parent^1.5 = d1^1.5 + d2^1.5), down to twigs one glyph wide; dendritic spines, small knobs on short necks, along
+// them; and one thin axon from the hillock that steers to the next neuron's body, wrapped in myelin internodes (orange
+// bands) with bare nodes of Ranvier between them, ending in a few boutons. A cell keeps: when it is grown (t), how far along
+// its branch from the body it is (d, in growth steps: the spike travels on this), how deep in the branch it sits (k), its
+// colour, and what it is (TYPE). The body grows first, then every branch outward at once, each neuron starting a little
+// after the last, timed to fill the network's whole life so the growth never stops.
+const STEP = 6, T_DEND = 0, T_SOMA = 1, T_NUC = 2, T_NUCL = 3, T_MYEL = 4, T_NODE = 5, T_SPINE = 6, T_BOUT = 7;
+function buildNet(def, id) { const [b0, b1, rate, K0] = def, K = Math.min(K0, 6), ticks = Math.ceil((b1 - b0) * 16 * rate) + 2, slot = new Int32Array(NCELL).fill(-1);
+  let hc = 0; const rnd = () => hash(1000 + id, hc++, 17), I = [], Dd = [], Kd = [], Nn = [], Hh = [], Ty = [], somas = [];
+  let cur = 0, maxD = 1;                                                // the neuron being grown; its longest path
+  const stamp = (x, y, w, d, hue, ty) => { if (d > maxD) maxD = d;
+    const c0 = Math.max(0, Math.floor((x - w) / GW)), c1 = Math.min(COLS - 1, Math.floor((x + w) / GW)), r0 = Math.max(0, Math.floor((y - w) / GH)), r1 = Math.min(ROWS - 1, Math.floor((y + w) / GH));
+    const put = (i, k) => { const q = slot[i]; if (q < 0) { slot[i] = I.length; I.push(i); Dd.push(d); Kd.push(k); Nn.push(cur); Hh.push(hue); Ty.push(ty); }
+      else if (ty > Ty[q] && ty !== T_SPINE || (ty === Ty[q] && k > Kd[q])) { Kd[q] = Math.max(k, ty === Ty[q] ? Kd[q] : 0); Ty[q] = ty; Hh[q] = hue; } };
+    let hit = false;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const dd = Math.hypot(c * GW + GW / 2 - x, r * GH + GH / 2 - y); if (dd > w) continue; hit = true; put(r * COLS + c, 1 - dd / w); }
+    if (!hit && x >= 0 && x < SW && y >= 0 && y < SH) put(Math.floor(y / GH) * COLS + Math.floor(x / GW), Math.min(.6, w / 5)); };   // a twig thinner than a glyph still marks its cell, faintly
+  // a dendrite segment: wanders, tapers, grows spines, then forks (Rall) or ends
+  const dend = (x, y, th, w, d, order, hue, maxOrder) => { const len = (125 * Math.pow(.8, order)) * (.7 + .6 * rnd()), steps = Math.max(4, Math.round(len / STEP));
+    for (let n = 0; n < steps; n++) { th += (rnd() - .5) * .26; x += Math.cos(th) * STEP; y += Math.sin(th) * STEP; d += 1; w *= .996;
+      if (x < -60 || x > SW + 60 || y < -60 || y > SH + 60) return;
+      stamp(x, y, w, d, hue, T_DEND);
+      if (order >= 1 && rnd() < .13) { const sa = th + (rnd() < .5 ? 1 : -1) * (PI / 2 + (rnd() - .5) * .5), sl = w + 6 + rnd() * 6;      // a spine: a short neck and a knob
+        stamp(x + Math.cos(sa) * sl * .55, y + Math.sin(sa) * sl * .55, 1.2, d + 1, hue, T_SPINE); stamp(x + Math.cos(sa) * sl, y + Math.sin(sa) * sl, 2.6, d + 2, hue, T_SPINE); }
+      if (order < maxOrder && n > 3 && n < steps - 3 && rnd() < .025) dend(x, y, th + (rnd() < .5 ? 1 : -1) * (.7 + rnd() * .5), w * .55, d, order + 1, rnd() < .7 ? hue : BRANCH_HUE[Math.floor(rnd() * BRANCH_HUE.length)], maxOrder); }
+    if (order >= maxOrder || w < 1.3 || (order > 1 && rnd() < .14)) return;
+    const f = .35 + rnd() * .3, p = Math.pow(w, 1.5), w1 = Math.pow(p * f, 2 / 3), w2 = Math.pow(p * (1 - f), 2 / 3), sp = .3 + rnd() * .45;
+    dend(x, y, th + sp, w1, d, order + 1, rnd() < .7 ? hue : BRANCH_HUE[Math.floor(rnd() * BRANCH_HUE.length)], maxOrder);
+    dend(x, y, th - sp * (.7 + rnd() * .6), w2, d, order + 1, rnd() < .7 ? hue : BRANCH_HUE[Math.floor(rnd() * BRANCH_HUE.length)], maxOrder); };
+  // the axon: hillock, then myelin internodes with nodes of Ranvier between, steering to the target; boutons at the end
+  const axon = (x, y, th, tx, ty) => { let d = 0, w = 7, seg = 0, inSeg = 0, segLen = 0;
+    for (let n = 0; n < 420; n++) { const want = Math.atan2(ty - y, tx - x); let da = want - th; while (da > PI) da -= TAU; while (da < -PI) da += TAU;
+      th += da * .07 + (rnd() - .5) * .16 + .012 * Math.sin(n * .11 + id); x += Math.cos(th) * STEP; y += Math.sin(th) * STEP; d += 1;
+      if (x < 6 || x > SW - 6 || y < 6 || y > SH - 6) break;
+      const left = Math.hypot(tx - x, ty - y); if (left < 62) break;
+      if (n < 7) { w = Math.max(2.4, w * .86); stamp(x, y, w, d, 1, T_DEND); continue; }                                       // the hillock narrows to the axon
+      if (inSeg <= 0) { if (segLen) { stamp(x, y, 2.2, d, 3, T_NODE); segLen = 0; inSeg = -1; if (rnd() < .5) continue; } segLen = 11 + Math.floor(rnd() * 7); inSeg = segLen; seg++; }
+      const u = 1 - inSeg / segLen; stamp(x, y, 8.4 * (.82 + .18 * Math.sin(u * PI)), d, 6 - .5 * (seg & 1) - .25 * Math.abs(u - .5), T_MYEL); inSeg--; }
+    for (let q = 0; q < 3; q++) { let bx = x, by = y, bt = th + (q - 1) * .7 + (rnd() - .5) * .3, bd = d; const nn = 5 + Math.floor(rnd() * 5);
+      for (let n = 0; n < nn; n++) { bt += (rnd() - .5) * .4; bx += Math.cos(bt) * STEP; by += Math.sin(bt) * STEP; bd += 1; stamp(bx, by, 1.6, bd, 1, T_DEND); }
+      stamp(bx, by, 4.2, bd + 1, 3, T_BOUT); } };
   for (let k = 0; k < K; k++) { let x = 0, y = 0;
-    for (let tries = 0; tries < 30; tries++) { x = 150 + rnd() * (SW - 300); y = 110 + rnd() * (SH - 220);
-      if (somas.every(([sx, sy]) => Math.hypot(x - sx, y - sy) > 330) && !(x < 460 && y > 780)) break; }
-    somas.push([x, y]); for (let q = 0; q < 6; q++) stamp(x, y, 8 + q * 6, q * .5, k + 64);                                      // the cell body, from its centre out
-    const nb = 4 + Math.floor(rnd() * 3), a0 = rnd() * TAU; for (let q = 0; q < nb; q++) { const th = a0 + q / nb * TAU + (rnd() - .5) * .5; newTip(x + Math.cos(th) * 30, y + Math.sin(th) * 30, th, 2, k, 14); } }
-  const minTips = Math.min(maxTips - 1, K * 2);
-  for (let t = 3; t <= ticks; t++) { let alive = 0; for (const tp of tips) if (tp.died > t) alive++;
-    const n0 = tips.length;
-    for (let q = 0; q < n0; q++) { const tp = tips[q]; if (tp.died <= t || tp.born >= t) continue;
-      tp.th += (rnd() - .5) * .5; tp.x += Math.cos(tp.th) * STEP; tp.y += Math.sin(tp.th) * STEP; tp.w = Math.max(4.5, tp.w * .988);
-      if (tp.x < 8 || tp.x > SW - 8 || tp.y < 8 || tp.y > SH - 8) { tp.died = t; alive--; continue; }
-      const i = Math.floor(tp.y / GH) * COLS + Math.floor(tp.x / GW);
-      if (i !== tp.last && core[i] >= 0 && core[i] !== q && t - tp.born > 4) { stamp(tp.x, tp.y, tp.w * 1.5, t, tp.n); tp.died = t; alive--; continue; }   // a meeting: a synapse, a small knot
-      core[i] = q; tp.last = i; stamp(tp.x, tp.y, tp.w, t, tp.n);
-      if (alive < maxTips && rnd() < .05) { newTip(tp.x, tp.y, tp.th + (rnd() < .5 ? 1 : -1) * (.5 + rnd() * .7), t, tp.n, tp.w * .8); tp.w *= .9; alive++; }
-      else if (alive > minTips && rnd() < .006) { tp.died = t; alive--; } }
-    while (alive < minTips && I.length > 9) { const q = Math.floor(rnd() * I.length), i = I[q]; if (Kd[q] < .6) { hc++; continue; } newTip((i % COLS) * GW + GW / 2, Math.floor(i / COLS) * GH + GH / 2, rnd() * TAU, t, Nn[q] & 63, 8); alive++; } }
-  return { b0, b1, rate, K, ticks, n: I.length, I: Int32Array.from(I), T: Float32Array.from(Tt), Kd: Float32Array.from(Kd), N: Uint8Array.from(Nn), somas, id, prune: PRUNE(def) }; }
+    for (let tries = 0; tries < 40; tries++) { x = 170 + rnd() * (SW - 340); y = 130 + rnd() * (SH - 260);
+      if (somas.every(([sx, sy]) => Math.hypot(x - sx, y - sy) > (K > 4 ? 380 : 470)) && !(x < 520 && y > 740)) break; }
+    somas.push([x, y]); }
+  const start = [], span = [], first = [0], far = [];
+  for (let k = 0; k < K; k++) { cur = k; maxD = 1; const [x, y] = somas[k], R0 = 40 + rnd() * 10, p1 = rnd() * TAU, p2 = rnd() * TAU, maxOrder = K > 4 ? 4 : 5;
+    const Rr = (a) => R0 * (1 + .17 * Math.sin(3 * a + p1) + .1 * Math.sin(5 * a + p2));
+    for (let r = Math.max(0, Math.floor((y - 70) / GH)); r <= Math.min(ROWS - 1, Math.floor((y + 70) / GH)); r++) for (let c = Math.max(0, Math.floor((x - 70) / GW)); c <= Math.min(COLS - 1, Math.floor((x + 70) / GW)); c++) {
+      const dx = c * GW + GW / 2 - x, dy = r * GH + GH / 2 - y, dd = Math.hypot(dx, dy), rr = Rr(Math.atan2(dy, dx)); if (dd > rr) continue;
+      const i = r * COLS + c; if (slot[i] >= 0) continue; slot[i] = I.length; I.push(i); Dd.push(dd / rr * 3); Kd.push(1 - .55 * dd / rr); Nn.push(k); Hh.push(.25 + .5 * dd / rr); Ty.push(T_SOMA); }
+    const nx = x + (rnd() - .5) * 12, ny = y + (rnd() - .5) * 10; stamp(nx, ny, 19, 1, 5, T_NUC); stamp(nx + 2, ny - 1, 7, 0, 3, T_NUCL);       // the nucleus, and its nucleolus
+    const nb = 5 + Math.floor(rnd() * 3), a0 = rnd() * TAU, hue0 = BRANCH_HUE[Math.floor(rnd() * BRANCH_HUE.length)];
+    for (let q = 0; q < nb; q++) { const th = a0 + q / nb * TAU + (rnd() - .5) * .45, r1 = Rr(th) * .8;
+      if (q === 0) { const [tx, ty] = K > 1 ? somas[(k + 1) % K] : [x + Math.cos(th) * 900, y + Math.sin(th) * 500]; axon(x + Math.cos(th) * r1, y + Math.sin(th) * r1, th, tx, ty); }
+      else dend(x + Math.cos(th) * r1, y + Math.sin(th) * r1, th, 11.5 + rnd() * 3.5, 3, 0, rnd() < .5 ? hue0 : BRANCH_HUE[Math.floor(rnd() * BRANCH_HUE.length)], maxOrder); }
+    first.push(I.length); far.push(maxD); start.push(k / K * .16 * ticks); span.push(ticks * (.74 + .26 * (k + 1) / K) - start[k]); }
+  const n = I.length, T = new Float32Array(n);
+  // a cell's moment: partly by how far out it is, partly by its rank among its neuron's cells, so the same amount is grown
+  // on every 16th and the far twigs do not trickle (by distance alone the last bar of a network stood nearly still)
+  for (let k = 0; k < K; k++) { const a = first[k], z = first[k + 1], ord = []; for (let q = a; q < z; q++) ord.push(q); ord.sort((u, v) => Dd[u] - Dd[v] || u - v);
+    for (let r = 0; r < ord.length; r++) { const q = ord[r]; T[q] = start[k] + Math.pow(.35 * Math.pow(Dd[q] / far[k], .85) + .65 * r / ord.length, b1 - b0 >= 7 ? 1.25 : 1.7) * span[k]; } }   // front-loaded: a new network bursts out, then fills in
+  return { b0, b1, rate, K, ticks, n, I: Int32Array.from(I), T, D: Float32Array.from(Dd), Kd: Float32Array.from(Kd), N: Uint8Array.from(Nn), H: Float32Array.from(Hh), Ty: Uint8Array.from(Ty), somas, id, prune: PRUNE(def), pb: SILENT.some(([a]) => a === b1) ? b1 + 1 : b1 }; }   // pb: when the eating-back begins (after the silent bar, if the network ends on one)
 const NET = NETS.map(buildNet);
 // how much of a network is grown at bar b: a burst at the start of every 16th, then it rests until the next
 function typed(net, b) { const s = silentOf(b); if (s) b = s[0]; const n16 = (Math.min(b, net.b1) - net.b0) * 16; return n16 <= 0 ? 0 : net.rate * (Math.floor(n16) + ease(fr(n16) / .4)) + 2; }
@@ -148,20 +187,25 @@ function frame(b) {
   cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, SW, SH);
   stampNo++; let nfig = 0, nhatch = 0, tInk = 0, total = 0;
   const shake = still ? 0 : 2.5 * s.kick + 6 * s.drop;
-  for (const net of NET) { const fadeEnd = net.b1 + net.prune; if (b < net.b0 || b >= fadeEnd) continue;
-    const T = typed(net, b), pr = b > net.b1 ? ease((Math.floor((b - net.b1) * 16) + ease(fr((b - net.b1) * 16) / .4)) / (net.prune * 16)) : 0;   // eaten back, on the 16ths too
-    const P = (net.ticks + 2) * (1 - pr), old = b > net.b1, base = (old ? .55 : 1) * (still ? .55 : 1), hue0 = lerp(NETHUE[net.id % NETHUE.length], 2, s.warm * .5);
-    const w0 = kAge * 64, w1 = (kAge + 1) * 64, I = net.I, Tt = net.T, Kd = net.Kd, Nn = net.N, sAge = still ? (b - silentOf(b)[0]) * 90 : -1;
+  for (const net of NET) { const fadeEnd = net.pb + net.prune; if (b < net.b0 || b >= fadeEnd) continue;
+    const T = typed(net, b), pr = b > net.pb ? ease((Math.floor((b - net.pb) * 16) + ease(fr((b - net.pb) * 16) / .4)) / (net.prune * 16)) : 0;   // eaten back, on the 16ths too
+    const P = (net.ticks + 2) * (1 - pr), old = b > net.pb, base = (old ? .55 : 1) * (still ? .55 : 1);
+    const w0 = kAge * 60, w1 = (kAge + 1) * 60, w2 = (kAge + 2) * 60, I = net.I, Tt = net.T, Dd = net.D, Kd = net.Kd, Nn = net.N, Hh = net.H, Ty = net.Ty, sAge = still ? (b - silentOf(b)[0]) * 110 : -1;
     for (let q = 0; q < net.n; q++) { const tt = Tt[q]; if (tt > T || tt > P) continue;
-      const i = I[q], age = T - tt, body = Nn[q] > 63; let k = body ? .55 + .45 * Kd[q] : Kd[q], hue = body ? 2 + .9 * Kd[q] : hue0 + .9 * k * k, lit = body ? .25 + .5 * s.kick : 0;   // the cell body: a dense gold knot that beats with the kick
-      if (!old && !still && age < 5) lit = 1 - age / 5;                                                                       // just grown: the tip is white-hot
+      const i = I[q], age = T - tt, ty = Ty[q], d = Dd[q]; let k = Kd[q], hue = lerp(Hh[q], 2, ty === T_DEND ? s.warm * .35 : 0), lit = 0;
+      if (ty === T_SOMA) { k = .5 + .5 * k; lit = .12 + .5 * s.kick; }                                                       // the cell body beats with the kick
+      else if (ty === T_NUC) { k = .55 + .45 * k; } else if (ty === T_NUCL) { k = 1; lit = .5; }
+      else if (ty === T_MYEL) k = .7 + .3 * k; else if (ty === T_SPINE || ty === T_BOUT) k = .5 + .5 * k; else k = .25 + .75 * k;
+      if (!old && !still && age < 5) lit = Math.max(lit, 1 - age / 5);                                                        // just grown: the tip is white-hot
       if (old && P - tt < 3) lit = Math.max(lit, .6);                                                                         // the edge being eaten back
-      if (kOn) { let d = w0 - tt; if (d < 0 || d >= 7) d = w1 - tt; if (d >= 0 && d < 7) lit = Math.max(lit, (1 - d / 7) * kOn); }   // the spike
-      for (let n = 0; n < s.notes.length; n++) { if ((s.notes[n][1] + net.id) % net.K !== (Nn[q] & 63)) continue; const d = s.notes[n][0] * 150 - tt; if (d >= 0 && d < 9) lit = Math.max(lit, 1 - d / 9); }
-      if (sAge >= 0) { const d = sAge - tt; if (d >= 0 && d < 8) lit = Math.max(lit, 1 - d / 8); }                            // the thrown stab: one slow spike through the stopped network
-      if (s.chop > .25 && hash(i, s.chopSeed, 3) < .22 * s.chop) { hue = 4; lit = Math.max(lit, .5); }                        // the vocal stab: a pink flicker
+      if (kOn && ty !== T_MYEL) { const win = ty === T_NODE ? 16 : 7; let dw = w0 - d; if (dw < 0 || dw >= win) dw = w1 - d; if (dw < 0 || dw >= win) dw = w2 - d;
+        if (dw >= 0 && dw < win) lit = Math.max(lit, (1 - dw / win) * kOn * (ty === T_NODE ? 1.4 : 1)); }                     // the spike: under the myelin it is hidden and jumps from node to node
+      for (let n = 0; n < s.notes.length; n++) { if ((s.notes[n][1] + net.id) % net.K !== Nn[q] || ty === T_MYEL) continue; const dw = s.notes[n][0] * 150 - d; if (dw >= 0 && dw < 9) lit = Math.max(lit, 1 - dw / 9); }
+      if (sAge >= 0 && ty !== T_MYEL) { const dw = sAge - d; if (dw >= 0 && dw < 8) lit = Math.max(lit, 1 - dw / 8); }        // the thrown stab: one slow spike through the stopped network
+      if (s.chop > .25 && (ty === T_SPINE || ty === T_BOUT || hash(i, s.chopSeed, 3) < .14 * s.chop)) { lit = Math.max(lit, .75 * s.chop); if (ty !== T_SPINE && ty !== T_BOUT) hue = 4; }   // the vocal stab: the spines and boutons light
       if (s.stab > .2 && hash(i, beat16, 4) < .3 * s.stab) lit = Math.max(lit, .6);
-      k = Math.min(1, (.22 + .78 * k) * (.75 + .4 * spec[BAND[i]]) + .45 * lit); if (lit > .35) hue = lerp(hue, 3, Math.min(1, lit * 1.2));
+      if (lit > 1) lit = 1;
+      k = Math.min(1, k * (.78 + .38 * spec[BAND[i]]) + .45 * lit); if (lit > .3) hue = lerp(hue, hue > 4.5 ? 3.4 : 2.7, Math.min(1, lit * 1.1));   // lit: toward a warm white-gold
       let al = clamp(.35 + .7 * k) * base * fadeAll * (1 - tfull * TMASK[i]); if (lit > 0) al = Math.min(1, al + .4 * lit * fadeAll * (1 - tfull * TMASK[i])); if (al < .03) continue;
       const lv = Math.min(SRAMP.length - 1, Math.pow(k, .8) * SRAMP.length | 0), set = SRAMP[lv], g = SSTART[lv] + (hash(i, still ? 0 : beat16 >> 1) * set.length | 0);
       const row = clamp(Math.round(hue * HSTEP), 0, NC - 1), px = (i % COLS) * GW + GW / 2, py = Math.floor(i / COLS) * GH + GH / 2, dx = shake ? (hash(i, 21) - .5) * 2 * shake : 0, dy = shake ? (hash(i, 22) - .5) * 2 * shake : 0;
