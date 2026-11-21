@@ -113,20 +113,48 @@ def measure(path):
 # 4. masters: gain to the target, limiter, measure, correct
 report = {"capture_seconds": round(frames / SR, 2), "null_test_dB": round(null_db, 1), "bar1_at_s": round(t0, 4), "kicks_per_bar": kicks,
           "as_played": measure(OUT + "-asplayed.wav"), "premaster": measure(premix), "stems_dBFS": {k: round(db(peak[k]), 1) for k in LAY}}
-for tag, target, limit in (("master-14", -14.0, -1.6), ("master-loud-10", -10.0, -2.4)):   # the limiter is not true-peak, so it gets a margin
+# 4. the master chain, from the research (BUGS_AND_ITERATIONS ITER-050):
+#    a. low end in mono below 120 Hz (dance practice: kick and bass mono, highs keep their width)
+#    b. match EQ toward the long-term spectrum of electronic records: Pestana, Ma, Reiss et al., AES 135 (2013), Table 2:
+#       electronic spectral slope -0.746 (log10 magnitude vs log10 frequency, 100 Hz to 10 kHz); corrections: cut up to 3 dB, boost up to 2 dB, line fitted by least squares
+#    c. glue compression on the whole mix, d. a gentle soft clip, e. a 4x oversampled limiter
+#    f. loudness: "master" at -9 LUFS (top-charting dance and electronic average -8.3, iZotope 2025), "master-14" for reference
+TARGET_SLOPE = -0.746
+def spectrum(path):
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", "44100", "-f", "f32le", "-"], capture_output=True).stdout
+    x = np.frombuffer(raw, np.float32).astype(np.float64); W = 4096; n = len(x) // W
+    mag = np.abs(np.fft.rfft(x[: n * W].reshape(n, W), axis=1)).mean(0); f = np.fft.rfftfreq(W, 1 / 44100)
+    sel = (f >= 100) & (f <= 10000)
+    return f, mag, float(np.polyfit(np.log10(f[sel]), np.log10(mag[sel]), 1)[0])
+f, mag, slope_pre = spectrum(premix)
+centers = [160 * 2 ** (i / 3) for i in range(0, 20)]                     # third-octave bands, 160 Hz to 13 kHz
+lvl = {c: 20 * np.log10(mag[(f >= c / 2 ** (1 / 6)) & (f < c * 2 ** (1 / 6))].mean()) for c in centers}
+line = {c: 20 * TARGET_SLOPE * np.log10(c / 1000) for c in centers}
+ref = float(np.mean([lvl[c] - line[c] for c in centers]))           # the target line's height: least-squares fit to our curve, so only the shape is corrected
+eq = {c: float(np.clip(ref + line[c] - lvl[c], -3, 2)) for c in centers}   # cut up to 3 dB, boost at most 2 dB
+eq_s = {c: float(np.mean([eq[d] for d in centers if abs(np.log2(d / c)) <= 0.34])) for c in centers}   # smooth over neighbours
+entries = ";".join([f"entry(20,0);entry(120,0)"] + [f"entry({c:.0f},{g:.2f})" for c, g in eq_s.items()] + ["entry(20000,%.2f)" % eq_s[centers[-1]]])
+chain = ("acrossover=split=120:order=4th[lo][hi];[lo]pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1[lom];[lom][hi]amix=inputs=2:normalize=0,"
+         f"firequalizer=gain_entry='{entries}',"
+         "acompressor=threshold=-20dB:ratio=2:attack=30:release=180:knee=6:makeup=1,")
+report["master_eq_dB"] = {f"{c:.0f}": round(g, 2) for c, g in eq_s.items()}; report["slope_premaster"] = round(slope_pre, 3)
+print(f"premaster slope {slope_pre:.3f} (target {TARGET_SLOPE}); match EQ dB:", " ".join(f"{c:.0f}:{g:+.1f}" for c, g in eq_s.items()))
+for tag, target in (("master", -9.0), ("master-14", -14.0)):
     gain = target - report["premaster"]["LUFS"]
-    for _ in range(3):
+    for _ in range(4):
         out = f"{OUT}-{tag}.wav"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", premix, "-af",
-                        f"volume={gain:.2f}dB,alimiter=limit={limit}dB:level=false:attack=4:release=60:asc=true,aresample=48000:filter_size=64:cutoff=0.97",
-                        "-c:a", "pcm_s24le", out], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", premix, "-filter_complex",
+                        f"[0:a]{chain}volume={gain:.2f}dB,asoftclip=type=tanh:threshold=0.9:oversample=4,"
+                        "aresample=192000,alimiter=limit=-1.4dB:level=false:attack=2:release=80:asc=true,aresample=48000:filter_size=64:cutoff=0.97[m]",
+                        "-map", "[m]", "-c:a", "pcm_s24le", out], check=True)
         m = measure(out)
         if abs(m["LUFS"] - target) <= 0.25:
             break
         gain += target - m["LUFS"]
+    m["slope"] = round(spectrum(out)[2], 3)
     report[tag] = m
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-c:a", "libmp3lame", "-b:a", "320k", f"{OUT}-{tag}.mp3"], check=True)
 json.dump(report, open(OUT + "-mix-report.json", "w"), indent=1)
-for k in ("as_played", "premaster", "master-14", "master-loud-10"):
+for k in ("as_played", "premaster", "master", "master-14"):
     m = report[k]
-    print(f"{k:14s} {m['LUFS']:6.1f} LUFS  LRA {m['LRA']:4.1f}  true peak {m['true_peak_dB']:+5.1f} dBTP  sample peak {m['sample_peak_dB']:+5.1f} dBFS  flat factor {m['flat_factor']:.1f}")
+    print(f"{k:14s} {m['LUFS']:6.1f} LUFS  LRA {m['LRA']:4.1f}  true peak {m['true_peak_dB']:+5.1f} dBTP  sample peak {m['sample_peak_dB']:+5.1f} dBFS  flat factor {m['flat_factor']:.1f}" + (f"  slope {m['slope']:.3f}" if "slope" in m else ""))
