@@ -42,6 +42,11 @@ const BG = '#16191d', PLATE = '#1c2026', FIELD_INK = '#e6d6ad';
 const COOL = [207, 216, 224], WARM = [233, 201, 160];                 // the sand: pale steel, gold at the lift
 const CX = 960, CY = 540, PR = 400, SR = 360;                         // plate rim radius; the sand's home radius
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+// ?cover: the release cover, 3000 x 3000, the middle square of the frame with the plate held still in the centre; the glyph
+// atlases are drawn at that size (AK), so the glyphs are sharp, not upscaled
+const COVER = new URLSearchParams(location.search).has('cover'), AK = COVER ? 3000 / 1080 : 1, TX = COVER ? -420 * AK : 0;
+if (COVER) { cv.width = cv.height = 3000; cv.style.aspectRatio = '1 / 1'; }
+const base = (k = 1, x = 0, y = 0) => cx.setTransform(k * AK, 0, 0, k * AK, x * AK + TX, y * AK);
 
 const TAU = Math.PI * 2, fr = (v) => v - Math.floor(v);
 const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
@@ -118,7 +123,8 @@ function cellC(p, ci) { const g = Math.floor(hash(ci, 9) * 3);
 function jump(b) { const s = song(b), cs = cells(b);
   return 7 * s.kick + 5 * s.roll * (1 + Math.sin(b * TAU * 8) * .5) + 12 * cs.bm + 16 * s.drop + 6 * s.chop; }
 // where the plate is: a slow figure-of-eight, a bounce on the kick, a shove on every boom, frozen in the silence
-function plate(b) { if (silent(b)) b = SILENT[0];
+// (on the cover the plate is held in the centre and drawn smaller, so the glyph field frames it)
+function plate(b) { if (COVER) return { x: CX, y: CY, sc: .8 }; if (silent(b)) b = SILENT[0];
   const s = song(b), cs = cells(b), n = sec(b)[2];
   const A = ease((b - 6) / 6) * ({ air: .35, bloom: .55, breakdown: .6 }[n] ?? 1) * (n === 'outro' || n === 'ringout' ? 1 - .8 * ease((b - 136) / 14) : 1);
   const sa = hash(Math.floor(b / 2), 91) * TAU;
@@ -145,8 +151,8 @@ function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - x
   const a = vhash(xi, yi), b = vhash(xi + 1, yi), c = vhash(xi, yi + 1), d = vhash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
 function field(x, y, t) { return .65 * vnoise(x * .11 + t * .06, y * .022 - t * .09) + .35 * vnoise(x * .31 - t * .04, y * .07 + t * .05); }
 const smooth = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
-const fatlas = document.createElement('canvas'); fatlas.width = FW * HRAMP.length; fatlas.height = FH;
-{ const a = fatlas.getContext('2d'); a.font = '13px ui-monospace, "SF Mono", Menlo, monospace'; a.textAlign = 'center'; a.textBaseline = 'middle'; a.fillStyle = FIELD_INK;
+const fatlas = document.createElement('canvas'); fatlas.width = FW * HRAMP.length * AK; fatlas.height = FH * AK;
+{ const a = fatlas.getContext('2d'); a.scale(AK, AK); a.font = '13px ui-monospace, "SF Mono", Menlo, monospace'; a.textAlign = 'center'; a.textBaseline = 'middle'; a.fillStyle = FIELD_INK;
   for (let i = 1; i < HRAMP.length; i++) { a.globalAlpha = .55 + .45 * i / (HRAMP.length - 1); a.fillText(HRAMP[i], i * FW + FW / 2, FH / 2); } }
 
 // ---------- the sand: glyphs from fine grain to heaped, code glyphs where it is thickest; dots for the cells ----------
@@ -154,10 +160,10 @@ const SRAMP = ['.', '·:', ':;', "-'", '=+', '*+', '#x', '%&', '0{}', '1<>/@'];
 const GW = 6, GH = 9, SGL = []; SRAMP.forEach((set) => [...set].forEach((ch) => SGL.push(ch)));
 const SSTART = []; { let n = 0; SRAMP.forEach((set) => { SSTART.push(n); n += set.length; }); }
 const DOT = SGL.length; SGL.push('·', '•', '●');                     // cell interior, membrane, nucleus
-const satlas = document.createElement('canvas'); satlas.width = SGL.length * 10; satlas.height = 12; const sa = satlas.getContext('2d');
+const satlas = document.createElement('canvas'); satlas.width = SGL.length * 10 * AK; satlas.height = 12 * AK; const sa = satlas.getContext('2d'); sa.scale(AK, AK);
 let satlasKey = '';
 function sandAtlas(rgb) { const key = rgb.join(); if (key === satlasKey) return; satlasKey = key;
-  sa.clearRect(0, 0, satlas.width, 12); sa.font = '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace'; sa.textBaseline = 'middle'; sa.textAlign = 'center';
+  sa.clearRect(0, 0, SGL.length * 10, 12); sa.font = '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace'; sa.textBaseline = 'middle'; sa.textAlign = 'center';
   sa.fillStyle = `rgb(${rgb.join(',')})`; SGL.forEach((ch, i) => sa.fillText(ch, i * 10 + 5, 6)); }
 const GRAINS = []; for (let y = CY - SR; y <= CY + SR; y += GH) for (let x = CX - SR; x <= CX + SR; x += GW) {
   const dx = x - CX, dy = y - CY, r = Math.hypot(dx, dy) / SR; if (r <= 1) GRAINS.push([x, y, r, Math.atan2(dy, dx), GRAINS.length]); }
@@ -182,9 +188,9 @@ function frame(b) {
   const s = song(b), spec = spectrum(b), still = silent(b), cs = cells(b), P = plate(b), PRs = PR * P.sc;
   const fade = 1 - ease((b - 152) / 2);                               // the ring-out fades to the plate alone
   const t = b * 240 / BPM; let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;    // seconds; the music's energy now
-  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, 1920, 1080);
+  base(); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, 1920, 1080);
   // the field: thins around the plate wherever it is, sways with the energy, rings of light run out on the kick and the booms
-  const ft = fieldTime(b), fa = (.15 + .1 * s.kick + .12 * s.drop + .05 * s.roll + .08 * s.chop + .06 * cs.bm) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fade;
+  const ft = fieldTime(b), fa = (.15 + .1 * s.kick + .12 * s.drop + .05 * s.roll + .08 * s.chop + .06 * cs.bm) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fade * (COVER ? 1.7 : 1);
   const kAge = fr(b * 4), kStr = still ? 0 : kickOn(b) * (1 - kAge) * .5, kR = PRs + 30 + 420 * kAge;
   const bAge = fr(cs.p), bStr = still || cs.p >= 3 ? 0 : cs.bm * .9 * (1 - bAge), bR = PRs + 30 + 560 * bAge;
   const sway = still ? 0 : 1.5 + 5 * E;
@@ -196,9 +202,9 @@ function frame(b) {
       v = v * 1.45 - .02 + (BAYER[(r & 3) * 4 + (c & 3)] / 16 - .5) * .22;
       const g = Math.max(0, Math.min(7, Math.floor(v * 8))); if (!g) continue;
       cx.globalAlpha = Math.min(1, fa * (1 + 1.6 * (kStr * Math.exp(-(((d - kR) / 34) ** 2)) + bStr * Math.exp(-(((d - bR) / 44) ** 2)))));
-      cx.drawImage(fatlas, g * FW, 0, FW, FH, c * FW, r * FH, FW, FH); } }
+      cx.drawImage(fatlas, g * FW * AK, 0, FW * AK, FH * AK, c * FW, r * FH, FW, FH); } }
   // the plate and the sand, drawn where the plate is now
-  cx.setTransform(P.sc, 0, 0, P.sc, P.x - P.sc * CX, P.y - P.sc * CY);
+  base(P.sc, P.x - P.sc * CX, P.y - P.sc * CY);
   cx.globalAlpha = 1; cx.fillStyle = PLATE; cx.beginPath(); cx.arc(CX, CY, PR, 0, TAU); cx.fill();
   const rgb = COOL.map((v, i) => Math.round(lerp(v, WARM[i], s.warm))); sandAtlas(rgb);
   cx.strokeStyle = `rgb(${rgb.join(',')})`; cx.lineWidth = 1.5; cx.globalAlpha = (.22 + .25 * s.kick + .4 * s.drop + .3 * cs.bm) * (.4 + .6 * fade);
@@ -249,12 +255,13 @@ function frame(b) {
     { const lim = PR - 9 - 3 * hash(id, 51), dx = px - CX, dy = py - CY, rr = Math.hypot(dx, dy);       // sand that reaches the rim piles up against it
       if (rr > lim) { px = CX + dx / rr * lim; py = CY + dy / rr * lim; } }
     { const rr = Math.hypot(px - CX, py - CY); if (rr > maxR) maxR = rr; }
-    cx.globalAlpha = clamp(.3 + .7 * k) * L; cx.drawImage(satlas, gi * 10, 0, 10, 12, px - 5, py - 6, 10, 12);
+    // (the cover's sand is brighter, so it reads at thumbnail size)
+    cx.globalAlpha = clamp((.3 + .7 * k) * (COVER ? 1.4 : 1)) * L; cx.drawImage(satlas, gi * 10 * AK, 0, 10 * AK, 12 * AK, px - 5, py - 6, 10, 12);
   }
   window.viz.maxR = maxR; window.viz.plateNow = P;
-  cx.setTransform(1, 0, 0, 1, 0, 0);
+  base();
   // the title, the first eight bars, bottom left, well clear of the plate
-  const ta = titleAlpha(b);
+  const ta = COVER ? 0 : titleAlpha(b);
   if (ta > 0) { cx.globalAlpha = ta * .9; cx.fillStyle = FIELD_INK; cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';
     cx.font = '700 56px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('A U R A', TITLE.x, TITLE.y);
     cx.globalAlpha = ta * .6; cx.font = '400 22px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('Bvby Ash', TITLE.x + 4, TITLE.y + 40); }

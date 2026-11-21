@@ -613,3 +613,12 @@ RSI: ~10 min, no re-work -> top loss: a contact sheet sampled every 2 bars lands
 - Checks: lag vs premaster 1-5 ms by cross-correlation (under a frame; OFF 0); layout check clean. **Full video:** `renders/aura-video.mp4` (replaces the r9 render), 1920 x 1080, 30 fps, 8,660 frames, 288.75 s, AAC 320k; 3 parts, 271-286 s each. In the muxed file the drop's audio returns at 194.95-195.00 s; frames at 194.90 / 195.03 / 195.20 s show flat sand, cells, booms. Contact sheet of 16 frames looked at. Rendered on Joona's "Render full" for the same look on r9; no separate r10 preview (retime only).
 
 RSI: ~12 min (5 min render, all 3 parts within 15 s) -> top loss: the r9 full render (~5 min) was made stale 10 minutes later by r10 -> no fix on my side: the song changed after the render, and the pre-retime meant r10 needed no rework.
+
+## ITER-065 (2026-11-21): Aura cover; release folder filled
+Joona: "make the cover please and upload it to distrokid".
+- `tools/viz/aura.html?cover`: 3000 x 3000, the frame's middle square, plate held in the centre at 0.8 size so the glyph field frames it, glyph atlases drawn at that size (sharp, not upscaled), sand x1.4 and field x1.7 brighter so it reads as a thumbnail; no text (as Slow Light). Bar 59 (the first breakdown): the gold web with a ring of hatching glowing around the plate. `renders/aura-cover.png/.jpg`, looked at full size and at 1000 and 200 px.
+- `~/Downloads/Bvby Ash project/Aura/`: cover JPG + PNG, the video, and a DistroKid WAV beside the master (16-bit 44.1 kHz, triangular dither, -9.4 LUFS, -1.2 dBFS peak, 288.75 s).
+- **DistroKid not uploaded yet:** the app's browser is signed out of DistroKid; waiting on Joona to sign in there.
+- My slip: two inline `//` comments I added in the middle of a one-line statement commented out the rest of the line (the sand's drawImage, and the plate's freeze in the silence). Caught on the first cover render (an empty plate); fixed before any video frame used it; layout check clean after.
+
+RSI: ~15 min, 3 cover rounds -> top loss: a comment pasted mid-line silently disabled code (one wasted round) -> fix: comments go on their own line in replacements; and pick files by name, not by tile order (I read the sheet's order wrong once).
