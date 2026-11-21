@@ -391,3 +391,14 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** live page playing, no eval or console error, cps 0.529 (127 BPM); per 16 bars: 64 kicks, 112 sub + 112 saw bass notes, 44 lead notes, 16 of 16 lead bars distinct, 14 of 16 bass bars distinct. Queried from the scheduler's current cycle (ITER-038 lesson).
 - **Not verified:** how it sounds; his call.
 - RSI: 2 saves, 2 checks -> 1 save spent on out-of-key fills -> note-against-chord check now run on the first save of any bass or melody.
+
+## ITER-040 (2026-11-21): track 12 restarted from the synths, deadmau5 x John Summit
+- **Asked:** "restart and use the new info i gave you. Deadmau5 synths are so unique and really carry, they convey the emotion." The brief: the detuned saw pluck, patient pacing, chords borrowed from the parallel major for a bittersweet lift (Strobe, I Remember).
+- **Done:** the ITER-039 sketch is replaced (still in git at 9b28917). Stage 1 is synths only, no kick and no bass, as the Slow Light restart taught. 128 BPM, E minor, 16 bars:
+  - Chords: Em9, Cmaj9, Gmaj9, D/F#, then E major add9 (borrowed from E major: G# against the first half's G is the lift), Cmaj9, Am9, Bsus4 -> B7 (leads home to Em).
+  - The mau5 pluck, arpeggiated through each chord: two detuned saws, resonant ladder filter with a snap-shut envelope on every note, base cutoff opening and closing over 32 bars, two arp shapes alternating, pumping gains, ping-pong pan, dotted delay.
+  - A glassy square an octave up on each quarter beat.
+  - A five-saw pad that swells, filter rising over the 16 bars, big room.
+- **Verified:** live page playing, no eval or console error, cps 0.533 (128 BPM); per 16 bars: 256 pluck, 64 glass, 78 pad notes; 0 notes outside their bar's chord (checked note by note, the ITER-039 rule); 14 of 16 pluck bars distinct (bars repeat only where a chord holds 2 bars with the same arp shape).
+- **Not verified:** how it sounds; his call.
+- RSI: 1 save, 1 check -> nothing lost -> none needed.
