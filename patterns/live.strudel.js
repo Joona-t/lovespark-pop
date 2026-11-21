@@ -64,16 +64,19 @@ const bell = tune.s("sine").fm(2).fmh(3.01).fmdecay(.6).fmsustain(.1)
   .attack(.005).decay(1.1).sustain(0).release(.8)
   .gain(.2).delay(.45).delaytime(3/8).delayfeedback(.5).room(.8).size(.95).pan(.55).orbit(4)
 
-// groove and full: the deadmau5 lead. Three detuned saws, a slow vibrato that only arrives on long notes,
-// a filter that softens the attack, dotted delay filling the gaps between phrases
-const lead = (cut = 2200, g = .26) => tune.s("sawtooth").unison(3).detune(.16)
-  .vib(4.5).vibmod(.12)
-  .lpf(cut).lpq(2).lpattack(.04).lpenv(1.5).lpdecay(.5).lpsustain(.6)
-  .attack(.02).decay(.5).sustain(.55).release(.45)
-  .gain(g).delay(.4).delaytime(3/16).delayfeedback(.48).room(.5).size(.8).orbit(4)
-// full: the same line an octave up, quiet and bright, the shimmer above everything
-const shimmer = tune.add(note(12)).s("triangle").attack(.02).decay(.4).sustain(.3).release(.5)
-  .gain(.08).delay(.5).delaytime(3/8).delayfeedback(.4).room(.7).orbit(4)
+// the bell an octave down: rounder and closer, like a vibraphone
+const bellLow = bell.add(note(-12)).gain(.24)
+
+// the soft synth: triangle + a filtered square an octave below the bell, slow vibrato, long echo
+const soft = stack(
+  tune.add(note(-12)).s("triangle").gain(.32),
+  tune.add(note(-12)).s("square").lpf(1400).gain(.07)
+).attack(.03).decay(.6).sustain(.5).release(.6).vib(4).vibmod(.1)
+  .delay(.5).delaytime(3/16).delayfeedback(.55).room(.6).size(.9).orbit(4)
+
+// Joona (2026-11-21), after auditioning six voices live: these three, layered at different times, then all together,
+// and the song closes on the soft synth alone
+const all3 = stack(bell, bellLow, soft)
 
 // ---- the bass: follows every chord. Roots under the slash chord D/F# take the F# ----
 const roots = note("<e1!2 c2!2 g1!2 fs1!2 e1!2 c2!2 a1!2 b1!2>")
@@ -121,15 +124,14 @@ const riser = s("white*16").decay(.07).sustain(0)
 
 // ---- the arrangement: 152 bars. The synths hold the room alone, then the drums arrive one by one ----
 arrange(
-  [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],                           // air: pad, a whisper of pluck
-  [16, stack(drone, bell, pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, a low drone, the melody as a far bell, still no drums
-  [16, stack(kick.gain(.42), shaker, bass(260, .18), pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick, the shaker, the bass rolling in quietly
-  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), lead(1900, .22), pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), lead(), shimmer, pad, glass, pluck(2400, 3000))], // full: everything
-  [16, stack(drone, bell.gain(.26), lead(1100, .16), pad.gain(.2), glass, pluck(2600, 800))],   // breakdown: drums out, the melody gets the room, the pluck closes
-  [8,  stack(roll, riser, pad, glass, lead(1400, .2), pluck(900, 4200)).mask("<1!7 [1 0]>")],     // build: roll, riser, pluck tears open, half a bar of silence
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), lead(2800, .3), shimmer, pad, glass, pluck(3200, 3800))], // drop: everything, brightest
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), lead(3200, .3), shimmer.gain(.12),
-             bell.add(note(12)).gain(.12), pad, glass, pluck(3800, 4400))],                         // drop II: the bell returns an octave up over the lead, the pluck opens once more
-  [16, stack(kick.gain(.5), hats.gain(.7), shaker, bass(380, .28), pad, glass, pluck(2400, 300))],  // outro: drums thin out, the pluck closes back to air
+  [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],   // air: pad, a whisper of pluck, no melody yet
+  [16, stack(drone, bell, pad, glass, pluck(700, 1400))],   // bloom: the melody arrives as a far bell, still no drums
+  [16, stack(kick.gain(.42), shaker, bass(260, .18), bellLow, pad, glass, pluck(1400, 1900))],   // pulse: soft kick, shaker, quiet bass; the bell an octave down
+  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the soft synth joins the bell
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), all3, pad, glass, pluck(2400, 3000))],   // full: all three voices together
+  [16, stack(drone, soft, bellLow, pad.gain(.2), glass, pluck(2600, 800))],   // breakdown: drums out; soft synth and the low bell, close and intimate
+  [8, stack(roll, riser, pad, glass, soft, pluck(900, 4200)).mask("<1!7 [1 0]>")],   // build: the soft synth alone over the roll, then half a bar of silence
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
+  [16, stack(kick.gain(.5), hats.gain(.7), shaker, bass(380, .28), soft.velocity(saw.range(1, .15).slow(16)), pad, glass, pluck(2400, 300))],   // outro: only the soft synth, fading with the pluck back to air
 )

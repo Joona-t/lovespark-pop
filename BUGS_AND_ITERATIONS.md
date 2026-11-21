@@ -463,3 +463,10 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - Both masters in Downloads, `Bvby Ash project/Aura`: 24-bit 48k, 16-bit 44.1k, 320k MP3 each. B's MP3 sent to Joona.
 - The live page now plays an audition (not committed, by his wish "switch a lot live before we save anything"): six voices for the melody, 8 bars each, over the bloom: FM bell, bell an octave down, grand piano with chords, Rhodes chords, a soft synth lead an octave down, celesta. Verified: no eval error, each slot plays only its voice (bell 20, bell down 20, piano 100, Rhodes 120, lead 20+20, celesta 20 notes).
 - RSI: B mastered twice -> one master lost to the fixed high-pass -> per-stem low-band check before mastering.
+
+## ITER-048 (2026-11-21): Aura's melody voices chosen live and staged across the song
+- **Asked:** after a live audition of six voices (FM bell, bell an octave down, piano, Rhodes chords, soft synth lead, celesta) and three combinations: "combine 1 and 5", "wow this combo is better ... also add the 2 one octave down", "remove the one octave down one", then "we will use these 3 in combination layering them at different times then all together then when we are closing the song we will only use the soft synth."
+- **Done (A and B alike):** the saw lead and shimmer are gone. Voices: `bell` (FM), `bellLow` (the bell an octave down), `soft` (triangle + filtered square an octave below the bell, slow vibrato, long echo), `all3`. Staging: air none · bloom bell · pulse bellLow · groove soft + bell · full all3 · breakdown soft + bellLow · build soft · drop and drop II all3 · outro soft alone, fading (velocity 1 -> 0.18 over 16 bars). Live page = B.
+- **Verified:** no eval error in either file; 0 notes outside their chord across 152 bars; 41 notes per voice per 16 bars where staged (20 in the 8-bar build), none in the air.
+- **Not done:** the masters in `Bvby Ash project/Aura` predate this change; they need a new capture and master once Joona has heard it.
+- RSI: 1 edit across 2 files, 1 check -> nothing lost -> none needed.
