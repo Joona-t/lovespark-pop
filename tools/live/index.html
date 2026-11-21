@@ -90,9 +90,14 @@
       dot.classList.add('on'); status.textContent = label;
     }, Math.max(0, wait));
   }
+  // &pattern=<name>: play patterns/<name>.strudel.js and ignore what the live file says, so a capture is pinned to one track
+  // while the live file keeps changing (and two captures can run side by side)
+  const pin = new URLSearchParams(location.search).get('pattern');
+  const pinned = pin ? fetch('/patterns/' + pin + '.strudel.js').then((r) => r.ok ? r.text() : Promise.reject('pattern ' + r.status)) : null;
   const es = new EventSource('/events');
-  es.onmessage = (e) => {
-    const { code, file } = JSON.parse(e.data);
+  es.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
+    const code = pinned ? await pinned : msg.code, file = pinned ? pin + '.strudel.js (pinned)' : msg.file;
     latest = code; pushes++;
     const first = (code.split('\n')[0] || '').replace(/^\/\/\s*/, '');
     status.textContent = status.dataset.label = `${file} · update ${pushes} · ${first}`;

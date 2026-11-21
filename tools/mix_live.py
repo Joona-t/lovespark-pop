@@ -66,6 +66,10 @@ for b in range(a.bars):
     kicks.append(int(sum(seg[int(i * len(seg) / 4): int(i * len(seg) / 4) + int(.08 * SR)].max() > 0.2 * kmax for i in range(4))) if len(seg) else 0)
 print("kicks per bar:", "".join(str(k) for k in kicks))
 print(f"first kick at {kick_on / SR:.3f} s -> bar 1 at {t0:.3f} s; master length {dur:.2f} s")
+lead_ms = 0.0
+if -0.05 <= t0 < 0:                          # a capture that started a few ms late (two running side by side): pad the gap with silence
+    lead_ms, t0 = -t0 * 1000, 0.0
+    print(f"capture started {lead_ms:.0f} ms after bar 1: padding with silence")
 if t0 < 0:
     sys.exit("bar 1 falls before the start of the capture")
 if frames / SR < t0 + dur - 0.05:
@@ -77,7 +81,7 @@ def st(name, chain):
     o, c = LAY[name]
     return f"[s_{name}]pan=stereo|c0=c{o}|c1=c{o + (1 if c == 2 else 0)},volume={pre:.2f}dB,{chain}[{name}]"
 graph = ";".join([
-    f"[0:a]asplit={len(LAY) - 1}" + "".join(f"[s_{k}]" for k in LAY if k != "master"),
+    f"[0:a]adelay={lead_ms:.1f}:all=1,asplit={len(LAY) - 1}" + "".join(f"[s_{k}]" for k in LAY if k != "master"),
     st("kick", "highpass=f=28"),
     st("drums", "highpass=f=250"),
     # drum chain: kick and tops through one compressor so they move together, then gentle saturation
@@ -90,10 +94,10 @@ graph = ";".join([
     "acompressor=threshold=-15dB:ratio=1.5:attack=30:release=220:knee=6:makeup=1,"
     f"afade=t=in:st=0:d=0.01,afade=t=out:st={a.bars * BAR:.2f}:d={a.tail_bars * BAR:.2f}:curve=qsin[mix]",   # only the delay tail fades
 ])
-src = ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", str(N), "-ss", f"{t0:.4f}", "-t", f"{dur:.3f}", "-i", RAW]
+src = ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", str(N), "-ss", f"{t0:.4f}", "-t", f"{dur - lead_ms / 1000:.3f}", "-i", RAW]
 premix = OUT + "-premaster.wav"
 subprocess.run(src + ["-filter_complex", graph, "-map", "[mix]", "-c:a", "pcm_f32le", premix], check=True)
-subprocess.run(src + ["-af", "pan=stereo|c0=c0|c1=c1", "-c:a", "pcm_f32le", OUT + "-asplayed.wav"], check=True)
+subprocess.run(src + ["-af", f"adelay={lead_ms:.1f}:all=1,pan=stereo|c0=c0|c1=c1", "-c:a", "pcm_f32le", OUT + "-asplayed.wav"], check=True)
 
 def measure(path):
     e = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True).stderr

@@ -470,3 +470,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error in either file; 0 notes outside their chord across 152 bars; 41 notes per voice per 16 bars where staged (20 in the 8-bar build), none in the air.
 - **Not done:** the masters in `Bvby Ash project/Aura` predate this change; they need a new capture and master once Joona has heard it.
 - RSI: 1 edit across 2 files, 1 check -> nothing lost -> none needed.
+
+## ITER-049 (2026-11-21): Aura A and B re-mastered with the new melody; captures pinned and run side by side
+- **Asked:** "Yes, re-master both."
+- **Live page:** `&pattern=<name>` plays `patterns/<name>.strudel.js` and ignores the live file, so a capture no longer depends on (or blocks) live work, and two captures can run at once. Verified in a tab: status "12-aura.strudel.js (pinned)" while the live file held B. First try used `params` before it was defined (console error); fixed by reading the URL directly.
+- **Mixer:** a capture that starts up to 50 ms after bar 1 is padded with silence instead of refused (B started 16 ms late with two captures launching together; only the slow pad sounds there). Anything later still stops. Regression: A mastered identically before and after (-14.1 LUFS, -1.3 dBTP).
+- **Results:** both captures 288.4 s, null -34.9 dB, four kicks per bar in 33-80 and 105-152 only. A: -14.1 LUFS, LRA 9.9, -1.3 dBTP (music high-pass 170 Hz). B: -14.2 LUFS, LRA 9.8, -1.1 dBTP (music high-pass 80 Hz). First kick at 60.008 s in both (bar 33 = 60.000; the 8 ms is the detector window). Files replaced in `Bvby Ash project/Aura`, both MP3s sent. Old captures `aura.f32`, `aura-b.f32` removed (superseded; disk was 98% full); raw stems kept: `renders/aura-r2.f32`, `aura-b-r2.f32`.
+- **Process slip:** a zsh loop with `set -- $v` did not split its words and ran nothing; caught by the empty output, rerun one by one.
+- RSI: two captures in parallel, 310 s instead of about 600 -> 1 mix run lost to the zsh loop, 1 to the late start -> pinned captures stay parallel; the mixer absorbs small late starts.
