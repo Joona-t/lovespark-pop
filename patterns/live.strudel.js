@@ -43,6 +43,35 @@ const pad = chords.s("sawtooth").unison(5).detune(.28)
   .lpf(saw.range(600, 2600).slow(16)).lpq(1)
   .gain(.16).room(.85).size(.95).orbit(5)
 
+// ---- the melody: 16 bars, every long note a chord tone, 3-3-2 phrasing ----
+// bars 1-8 ask and come to rest on F# over D/F#; bars 9-16 answer: G# over the borrowed E major is the high point,
+// then G natural over C (the bittersweet turn back to minor), and D# over B7 pulls home to the E at bar 1
+const tune = note(`<
+  [b4 ~ ~ fs5 ~ ~ e5 ~]   [d5 ~ ~ ~ ~ ~ e5 fs5]
+  [g5 ~ ~ e5 ~ ~ d5 ~]    [e5 ~ ~ ~ ~ ~ ~ ~]
+  [d5 ~ ~ b4 ~ ~ d5 ~]    [fs5 ~ ~ ~ g5 ~ fs5 ~]
+  [e5 ~ ~ d5 ~ ~ a4 ~]    [fs4 ~ ~ ~ ~ ~ ~ ~]
+  [gs5 ~ ~ fs5 ~ ~ e5 ~]  [b5 ~ ~ ~ gs5 ~ ~ ~]
+  [g5 ~ ~ e5 ~ ~ b4 ~]    [d5 ~ ~ ~ e5 ~ ~ ~]
+  [c5 ~ ~ e5 ~ ~ a5 ~]    [g5 ~ ~ ~ e5 ~ b4 ~]
+  [a4 ~ ~ b4 ~ ~ e5 ~]    [ds5 ~ ~ ~ fs5 ~ ~ ~]>`)
+
+// bloom: the melody as a soft FM bell, far away in a big room, the first time you hear it
+const bell = tune.s("sine").fm(2).fmh(3.01).fmdecay(.6).fmsustain(.1)
+  .attack(.005).decay(1.1).sustain(0).release(.8)
+  .gain(.2).delay(.45).delaytime(3/8).delayfeedback(.5).room(.8).size(.95).pan(.55).orbit(4)
+
+// groove and full: the deadmau5 lead. Three detuned saws, a slow vibrato that only arrives on long notes,
+// a filter that softens the attack, dotted delay filling the gaps between phrases
+const lead = (cut = 2200, g = .26) => tune.s("sawtooth").unison(3).detune(.16)
+  .vib(4.5).vibmod(.12)
+  .lpf(cut).lpq(2).lpattack(.04).lpenv(1.5).lpdecay(.5).lpsustain(.6)
+  .attack(.02).decay(.5).sustain(.55).release(.45)
+  .gain(g).delay(.4).delaytime(3/16).delayfeedback(.48).room(.5).size(.8).orbit(4)
+// full: the same line an octave up, quiet and bright, the shimmer above everything
+const shimmer = tune.add(note(12)).s("triangle").attack(.02).decay(.4).sustain(.3).release(.5)
+  .gain(.08).delay(.5).delaytime(3/8).delayfeedback(.4).room(.7).orbit(4)
+
 // ---- the bass: follows every chord. Roots under the slash chord D/F# take the F# ----
 const roots = note("<e1!2 c2!2 g1!2 fs1!2 e1!2 c2!2 a1!2 b1!2>")
 const uppers = note("<b1!2 g1!2 d2!2 a1!2 b1!2 g1!2 e2!2 fs2!2>")    // a chord tone above each root (the 5th; A over F#)
@@ -65,7 +94,7 @@ const bass = (cut = 380, bite = .36) => stack(
 
 // ---- drums, layer 1: the kick. 909, four on the floor, ducks the pluck and the pad so the synths breathe with it ----
 const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
-  .orbit(9).duckorbit("2:3:5").duckattack(.2).duckdepth(.7)
+  .orbit(9).duckorbit("2:3:4:5").duckattack(.2).duckdepth(.7)
 
 // ---- drums, layer 2: Summit's groove. Clap on 2 and 4, shuffled 16th hats, open hat on every off-beat ----
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
@@ -84,8 +113,8 @@ const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.
 // ---- the arrangement: 80 bars. The synths hold the room alone, then the drums arrive one by one ----
 arrange(
   [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],                           // air: pad, a whisper of pluck
-  [16, stack(drone, pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, a low drone, still no drums
+  [16, stack(drone, bell, pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, a low drone, the melody as a far bell, still no drums
   [16, stack(kick.gain(.42), shaker, bass(260, .18), pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick, the shaker, the bass rolling in quietly
-  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), pad, glass, pluck(2400, 3000))], // full: everything
+  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), lead(1900, .22), pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), lead(), shimmer, pad, glass, pluck(2400, 3000))], // full: everything
 )

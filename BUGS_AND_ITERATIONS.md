@@ -417,3 +417,10 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error; bass notes per section: air 0, bloom 16, pulse/groove/full 256 each; 0 notes outside their bar's chord across all 80 bars.
 - **Not verified:** how it sounds; his listen.
 - RSI: 2 saves, 2 checks -> 1 save spent on the beat-4 fill -> bass-on-kick check now runs with the chord check on every bass save.
+
+## ITER-043 (2026-11-21): track 12 melody lead
+- **Asked:** "Add melody lead."
+- **Done:** a 16-bar melody over the progression, every note a chord tone, 3-3-2 phrasing. Bars 1-8 ask and rest on F# over D/F#; bars 9-16 answer: G# over the borrowed E major is the high point (B5), G natural over C turns it back to minor, D# over B7 pulls home to E. Three voices: a soft FM bell far away in the bloom (the first time it is heard, about 30 s in), the deadmau5 saw lead (three detuned saws, slow vibrato, soft filter attack, dotted delay) in the groove, and the lead plus an octave-up triangle shimmer in the full section. The kick ducks the melody bus lightly too (`duckorbit("2:3:4:5")`).
+- **Verified:** no eval error; 41 melody notes per 16 bars: bloom 41 bell, groove 41 lead, full 41 lead + 41 shimmer, none in air or pulse; 0 notes outside their bar's chord across all 80 bars; 15 of 16 lead bars distinct by pitch (bars 11 and 14 share G E B in different rhythms).
+- **Not verified:** how it sounds; his listen.
+- RSI: 1 save, 1 check -> nothing lost -> none needed.
