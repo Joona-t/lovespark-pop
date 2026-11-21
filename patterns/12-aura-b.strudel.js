@@ -1,8 +1,8 @@
-// 12 "Aura" (version B: deeper, resonant, echoey arp) · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
+// 12 "Aura" (version B: deeper, resonant, echoey arp) · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 104 bars (~3:15)
 // The name is Joona's word for the opening: "this aura of airy emotional resonance".
 // Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
 // Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
-// Sections, 152 bars (~4:45): air 16 · bloom 16 · pulse 16 · groove 16 · full 16 · breakdown 16 · build 8 · drop 32 · outro 16
+// Sections, 104 bars (~3:15): air 8 · bloom 8 · pulse 8 · groove 16 · full 16 · breakdown 8 · build 8 · drop 16 · outro 16
 // From Joona's brief: the detuned saw pluck, patience, chords borrowed from the parallel major for a bittersweet lift.
 // (Scrapped today: a Summit bass loop, a Ganacci bounce, and a first mau5 x Summit sketch.)
 // @q 4
@@ -100,7 +100,7 @@ const bass = (cut = 380, bite = .36) => stack(
 
 // ---- drums, layer 1: the kick. 909, four on the floor, ducks the pluck and the pad so the synths breathe with it ----
 const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
-  .orbit(9).duckorbit("2:3:4:5").duckattack(.2).duckdepth(.7)
+  .orbit(9).duckorbit("2:3:4:5:6").duckattack(.2).duckdepth(.7)
 
 // ---- drums, layer 2: Summit's groove. Clap on 2 and 4, shuffled 16th hats, open hat on every off-beat ----
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
@@ -123,19 +123,40 @@ const riser = s("white*16").decay(.07).sustain(0)
 // ---- the outro's air: a halo of the chords an octave up that swells slowly, and the arp opening with no acid resonance ----
 const halo = chords.add(note(12)).s("triangle").attack(1.6).decay(.5).sustain(.8).release(3)
   .gain(.06).lpf(5000).room(.9).size(.98).pan(sine.range(.3, .7).slow(8)).orbit(5)
-const airPluck = pluck(3000, 4200).add(note(12)).lpq(3).gain(.55)   // B: back up an octave so the ending floats.delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))   // even gain: the beat accent read as a pulse once the bell was gone
+const airPluck = pluck(3000, 4200).add(note(12)).lpq(3).gain(.55).delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))   // B: an octave up so the ending floats (a comment here once cut off the echo, reverb and fade). Even gain: the beat accent read as a pulse once the bell was gone
 
-// ---- the arrangement: 152 bars. The synths hold the room alone, then the drums arrive one by one ----
+// ---- John Summit (Joona, 2026-11-21: "also try make it more john summit like"): the drop is led by the bass and a vocal hook ----
+// a vocal chop: a saw through a formant filter, syncopated off the kick, on the chord tones; Summit's hooks are voices, not leads
+const chopNotes = note("<b4!2 g4!2 b4!2 a4!2 b4!2 g4!2 c5!2 b4!2>")
+const chop = chopNotes.struct("<[~ ~ x ~ ~ x ~ ~ x ~ ~ ~ x ~ ~ ~] [~ ~ x ~ ~ x ~ ~ ~ ~ x ~ ~ x ~ ~]>")
+  .s("sawtooth").vowel("<a o e o>").attack(.004).decay(.14).sustain(0).release(.06).lpf(3200)
+  .gain(.3).delay(.25).delaytime(3/16).delayfeedback(.3).room(.3).orbit(6)
+// a snare under the clap on 2 and 4: the crack of a tech-house backbeat (no new ticking: it lands with the clap)
+const snap = s("~ sd ~ sd").bank("RolandTR909").gain(.2).hpf(350).decay(.12).orbit(1)
+// the drop bass: the rolling line opened up and driven harder, so the bass is the lead
+const summitBass = bass(1150, .6)
+
+// the build (Joona: "dont do the hihat classic build up be unique", "research what john summit does"). No snare roll, no noise riser.
+// Summit lets the vocal lead and keeps the drop to "just a kick in bass" (GRAMMY, 2024), so the build takes the kick and the low end away:
+// the rolling bassline plays alone, thin (high-passed) with its filter climbing over 8 bars; the vocal hook answers with longer and
+// longer echoes; in the last bar everything stops but one hook stab thrown into the echo, and the drop lands kick, sub and all
+const buildBass = bass(saw.range(250, 1150).slow(8), .55).hpf(260).mask("<1!7 0>")
+const buildChop = chop.gain(saw.range(.14, .32).slow(8)).delayfeedback(saw.range(.3, .62).slow(8)).mask("<1!7 0>")
+const throwChop = note("b4").struct("<~!7 [x ~ ~ ~]>").s("sawtooth").vowel("o").attack(.004).decay(.25).sustain(0).release(.1)
+  .lpf(3200).gain(.34).delay(.6).delaytime(3/16).delayfeedback(.7).room(.5).size(.9).orbit(6)
+const build = stack(buildBass, buildChop, throwChop, stack(pad, soft, pluck(900, 4200)).mask("<1!7 0>"))
+
+// ---- the arrangement: 104 bars (~3:15). Cut from 152 (Joona: "4:47 is too long as its a bit repetitive"):
+// the intro sections halved, the breakdown halved, the second drop removed ----
 arrange(
-  [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],   // air: pad, a whisper of pluck, no melody yet
-  [16, stack(drone, bell, pad, glass, pluck(700, 1400))],   // bloom: the melody arrives as a far bell, still no drums
-  [16, stack(kick.gain(.42), shaker, bass(260, .18), bellLow, pad, glass, pluck(1400, 1900))],   // pulse: soft kick, shaker, quiet bass; the bell an octave down
-  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the soft synth joins the bell
-  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(520, .42), all3, pad, glass, pluck(2400, 3000))],   // full: all three voices together
-  [16, stack(drone, soft, bellLow, pad.gain(.2), glass, pluck(2600, 800))],   // breakdown: drums out; soft synth and the low bell, close and intimate
-  [8, stack(roll, riser, pad, glass, soft, pluck(900, 4200)).mask("<1!7 [1 0]>")],   // build: the soft synth alone over the roll, then half a bar of silence
-  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
-  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
+  [8, stack(pad, glass.gain(.07), pluck(300, 900).gain(.6))],   // air: pad, a whisper of pluck, no melody yet
+  [8, stack(drone, bell, pad, glass, pluck(900, 1600))],   // bloom: the melody arrives as a far bell, still no drums
+  [8, stack(kick.gain(.42), bass(260, .18), bellLow, pad, glass, pluck(1600, 2000))],   // pulse: soft kick, quiet bass; the bell an octave down
+  [16, stack(kick.gain(.54), clap, hats, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the soft synth joins the bell
+  [16, stack(kick, clap, snap, hats, crash, bass(700, .46), all3, chop.mask("<0!8 1!8>"), pad, glass, pluck(2400, 3000))],   // full: all three voices; the vocal hook enters halfway
+  [8, stack(drone, soft, bellLow, pad.gain(.2), glass, pluck(2600, 1000))],   // breakdown: drums out; soft synth and the low bell, close and intimate
+  [8, build],   // build: the kick and low end leave, the filtered bassline and the vocal hook climb, one bar of near-silence with a thrown echo
+  [16, stack(kick, clap, snap, hats, crash, summitBass, all3.velocity(.8), chop, pad, glass, pluck(3200, 4200))],   // drop (Summit): the bass and the vocal hook lead, the three voices sit just behind
   [16, stack(kick.gain(.4).duckdepth(.25).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo,
              soft.velocity(saw.range(1, .3).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above; the soft synth alone carries the melody (Joona: "the ending should be the soft synth not the bell")
 )
