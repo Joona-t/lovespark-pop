@@ -506,3 +506,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Stopped and discarded:** two full captures (rim still in), two more (old outro). Nothing re-rendered until the ending is approved.
 - **Research:** `research/music-theory.md` (groove and syncopation, build-ups and drops, texture over harmony, modal mixture, expectation).
 - RSI: 4 full captures discarded -> sound changes were going to full renders before a preview -> preview the changed section first, measure it, then render.
+
+## ITER-053 (2026-11-21): Aura's ending rebuilt airy and light
+- **Asked:** "the 4 ending no tick, why is it so buzzy so acidy?" then "change the end to be more airy and light, like the listener is flying or dreamy."
+- **Why it was acidy:** B's arp filter (resonance 14) swept down to about 180 Hz in the outro, a TB-303 acid squelch; the bass's driven saw was exposed; and the preview was pushed alone to -9 LUFS, adding clip and limiter fuzz.
+- **New outro (A, B, live):** kick and the clean sine sub (driven saw at gain 0) for bars 1-8, then nothing below; `airPluck` = the arp opening 3000 -> 4200 (B: x0.6 and an octave up) with resonance 3, more echo and room, fading; the bell an octave up in a huge room; `halo` = the chords an octave up on soft triangles, slow swell, orbit 5; the soft synth and pad fading.
+- **Verified:** no eval error in A, B, live and the preview; 0 notes outside the chord; kick 4 per bar in bars 1-8 and 0 after (stem peaks -6.0 then silent; bass -11.1 then silent). Mastered preview vs the previous ending: air 6-16 kHz -29.4 -> -20.0 dB share, low end < 120 Hz -2.5 -> -5.3 dB, beat regularity 0.77 -> 0.57, null -36.2 dB. Preview sent at -14 LUFS ("5 - airy ending").
+- **Check slip:** the first size check on the preview capture used a 4 s quiet window and caught a pause between upload chunks (26.7 of 33 s); re-checked with 10 s: 33.2 s complete.
+- RSI: 1 preview render, 2 checks -> 1 false "done" on file size -> waits use a 10 s quiet window.

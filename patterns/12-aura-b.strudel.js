@@ -120,6 +120,11 @@ const roll = s("sd*<4 4 8 8 16 16 [16 32] 32>").bank("RolandTR909")
 const riser = s("white*16").decay(.07).sustain(0)
   .lpf(saw.range(400, 9000).slow(8)).hpf(300).gain(saw.range(0, .22).slow(8)).pan(sine.range(.3, .7).fast(4)).orbit(1)
 
+// ---- the outro's air: a halo of the chords an octave up that swells slowly, and the arp opening with no acid resonance ----
+const halo = chords.add(note(12)).s("triangle").attack(1.6).decay(.5).sustain(.8).release(3)
+  .gain(.06).lpf(5000).room(.9).size(.98).pan(sine.range(.3, .7).slow(8)).orbit(5)
+const airPluck = pluck(3000, 4200).add(note(12)).lpq(3)   // B: back up an octave so the ending floats.delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))
+
 // ---- the arrangement: 152 bars. The synths hold the room alone, then the drums arrive one by one ----
 arrange(
   [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],   // air: pad, a whisper of pluck, no melody yet
@@ -131,5 +136,6 @@ arrange(
   [8, stack(roll, riser, pad, glass, soft, pluck(900, 4200)).mask("<1!7 [1 0]>")],   // build: the soft synth alone over the roll, then half a bar of silence
   [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
   [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
-  [16, stack(kick.gain(.5), bass(380, .28), soft.velocity(saw.range(1, .15).slow(16)), pad, pluck(2400, 300))],   // outro: no hats (Joona: the exposed tick "sounds like someone forgot the metronome on"); kick, bass and the soft synth fade with the pluck
+  [16, stack(kick.gain(.4).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo, bell.add(note(12)).gain(.13).room(.95).size(.98),
+             soft.velocity(saw.range(1, .15).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above
 )

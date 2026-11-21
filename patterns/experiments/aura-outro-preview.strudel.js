@@ -1,4 +1,4 @@
-// Aura B preview: the outro without hats · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
+// Aura B preview: the airy ending · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
 // The name is Joona's word for the opening: "this aura of airy emotional resonance".
 // Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
 // Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
@@ -120,6 +120,12 @@ const roll = s("sd*<4 4 8 8 16 16 [16 32] 32>").bank("RolandTR909")
 const riser = s("white*16").decay(.07).sustain(0)
   .lpf(saw.range(400, 9000).slow(8)).hpf(300).gain(saw.range(0, .22).slow(8)).pan(sine.range(.3, .7).fast(4)).orbit(1)
 
+// ---- the outro's air: a halo of the chords an octave up that swells slowly, and the arp opening with no acid resonance ----
+const halo = chords.add(note(12)).s("triangle").attack(1.6).decay(.5).sustain(.8).release(3)
+  .gain(.06).lpf(5000).room(.9).size(.98).pan(sine.range(.3, .7).slow(8)).orbit(5)
+const airPluck = pluck(3000, 4200).add(note(12)).lpq(3)   // B: back up an octave so the ending floats.delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))
+
 arrange(
-  [16, stack(kick.gain(.5), bass(380, .28), soft.velocity(saw.range(1, .15).slow(16)), pad, pluck(2400, 300))],   // outro: no hats (Joona: the exposed tick "sounds like someone forgot the metronome on"); kick, bass and the soft synth fade with the pluck
+  [16, stack(kick.gain(.4).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo, bell.add(note(12)).gain(.13).room(.95).size(.98),
+             soft.velocity(saw.range(1, .15).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above
 )
