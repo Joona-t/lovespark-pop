@@ -599,3 +599,11 @@ RSI: ~25 min, 2 still rounds, 1 preview render (77 s) -> top loss: a wrong `-t` 
 - **Full video** (Joona: "Render full"): `renders/aura-video.mp4`, 1920 x 1080, 30 fps, 7,312 frames, 243.76 s, H.264 + AAC 320k with `aura-r9-master.wav`; 3 parts in headless Chrome on the MacBook, 235-245 s each. In the muxed file the drop's audio returns at 149.95-150.00 s; frames at 149.90 / 150.03 / 150.20 s show flat sand, then cells, then the booms. Contact sheet of 16 frames looked at.
 
 RSI: ~10 min, no re-work -> top loss: a contact sheet sampled every 2 bars lands on the same beat of every chord and never shows the cells -> fix: sample transitions with off-grid stills (done here), or sheet at a step that is not a multiple of the chord length.
+
+## ITER-063 (2026-11-21): Aura: the first version's intro in front of the current song
+- **Asked:** Joona, on the first master (`aura-master-loud-10.wav`): "lets combine the versions because this intro is significantly more my vision but i prefer the current version in terms of everything coming together".
+- **What the first intro was** (commit 7bb87d8, same voices as now): air, bloom and pulse at 16 bars each instead of 8, the bright arp alone, an 808 shaker in the pulse.
+- **Previews:** 11a (exact, with the shaker: pulse 35.6 dB swing, over the 30 dB tick line) and 11b (no shaker: 29.5 dB), each into the current groove. Joona: "11b, no shaker".
+- **Change:** the three intro rows are the first version's (16 bars, `pluckBright`, no shaker, no low bell in the pulse); the deep arp now joins at the groove, so the two arps arriving together is the moment the song opens. Everything from the groove on is r9, 24 bars later. 154 bars, 4:49.
+- **Master (aura-r10):** -9.4 LUFS, LRA 5.6, -1.4 dBTP, slope -0.964, null -35.1 dB, 288.75 s; kicks bars 33-80 and 105-136 as arranged; ending -18, -26, -38, -58 dBFS; timing 0.00 / -0.02 / 0.12 ms. Tick scan: intro 16-29 dB, outro 13.2, drop 32.2 (the approved hat-on-kick + clap set). Filed as the one file in `Bvby Ash project/Aura` (checksum matches); r9 kept in renders/.
+- RSI: 2 previews (216 s, in parallel) + 1 capture (292 s) -> nothing discarded -> none needed.

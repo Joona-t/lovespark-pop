@@ -1,8 +1,8 @@
-// 12 "Aura" · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 130 bars (~4:04)
+// 12 "Aura" · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 154 bars (~4:49)
 // The name is Joona's word for the opening: "this aura of airy emotional resonance".
 // Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
 // Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
-// Sections, 130 bars (~4:04): air 8 · bloom 8 · pulse 8 · groove 16 · full 16 · breakdown A 8 · breakdown B 8 · build 8 · drop 16 · lift 8 · outro 24 · ring-out 2
+// Sections, 154 bars (~4:49): air 16 · bloom 16 · pulse 16 · groove 16 · full 16 · breakdown A 8 · breakdown B 8 · build 8 · drop 16 · lift 8 · outro 24 · ring-out 2
 // From Joona's brief: the detuned saw pluck, patience, chords borrowed from the parallel major for a bittersweet lift.
 // (Scrapped today: a Summit bass loop, a Ganacci bounce, and a first mau5 x Summit sketch.)
 // @q 4
@@ -156,16 +156,16 @@ const throwChop = note("b4").struct("<~!7 [x ~ ~ ~]>").s("sawtooth").vowel("o").
   .lpf(3200).gain(.34).delay(.6).delaytime(3/16).delayfeedback(.7).room(.5).size(.9).orbit(6)
 const build = stack(buildBass, buildChop, throwChop, stack(pad, soft, pluck(900, 4200)).mask("<1!7 0>"))
 
-// ---- the arrangement: 130 bars (~4:04). Joona (2026-11-21, after preview 10b): "B and lets extend the full version to around 4 mins
+// ---- the arrangement: 154 bars (~4:49). Joona (2026-11-21, after preview 10b): "B and lets extend the full version to around 4 mins
 // the ending was cut off too short ... 1 short section where its just a and then just b before coming together again,
-// but having them start together is a major unlock". Both arps together from bar 1; the breakdown splits them; the outro runs 24 bars
+// but having them start together is a major unlock". Then (after previews 11a/11b) the first version's 48-bar intro was put back in front: the bright arp alone, the deep arp joining at the groove; the breakdown splits them; the outro runs 24 bars
 // and two empty bars at the end let the echoes and reverb ring out instead of being cut ----
 const outroPluck = pluckBright(3000, 4200).lpq(3).gain(.55).delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(24))
 arrange(
-  [8, stack(pad, glass.gain(.07), pluck(300, 900).gain(.6))],   // air: pad, both arps whispering, no melody yet
-  [8, stack(drone, bell, pad, glass, pluck(900, 1600))],   // bloom: the melody arrives as a far bell, still no drums
-  [8, stack(kick.gain(.42), bass(260, .18), bellLow, pad, glass, pluck(1600, 2000))],   // pulse: soft kick, quiet bass; the bell an octave down
-  [16, stack(kick.gain(.54), clap, hats, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the soft synth joins the bell
+  [16, stack(pad, glass.gain(.07), pluckBright(300, 700).gain(.6))],   // air (the first version's intro, Joona: "this intro is significantly more my vision"): 16 bars, the bright arp alone, a whisper
+  [16, stack(drone, bell, pad, glass, pluckBright(700, 1400))],   // bloom: 16 bars, the arp opens, a low drone, the melody as a far bell, still no drums
+  [16, stack(kick.gain(.42), bass(260, .18), pad, glass, pluckBright(1400, 1900))],   // pulse: 16 bars, a soft kick and the bass rolling in quietly (the first version's shaker left out: preview 11b)
+  [16, stack(kick.gain(.54), clap, hats, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the deep arp joins the bright one here (the two coming together), the soft synth joins the bell
   [16, stack(kick, clap, snap, hats, crash, bass(700, .46), all3, chop.mask("<0!8 1!8>"), pad, glass, pluck(2400, 3000))],   // full: all three voices; the vocal hook enters halfway
   [8, stack(drone, soft, bellLow, pad.gain(.2), glass, pluckBright(2600, 1000))],   // breakdown I: the bright arp alone (version A)
   [8, stack(drone, soft, bellLow, pad.gain(.2), pluckDeep(1600, 2600))],   // breakdown II: the deep resonant arp alone (version B)
