@@ -23,21 +23,21 @@
 // into strands, a 4x4 Bayer threshold; from Joona-t.github.io assets/glyph-field.js, basalt ink).
 // Every frame is a pure function of the bar position (no state, no Math.random): ?bar=N holds a frame, PLAY runs on the
 // master's clock, window.viz.shot(bar) feeds tools/viz/render_viz.mjs.
-// r8, the John Summit build (104 bars). Joona: "make the visualizer go insane ... have the circle moving, but have the glyph
+// r9, the layered-arps cut (130 bars, ~4:04; the John Summit drop from r8). Joona: "make the visualizer go insane ... have the circle moving, but have the glyph
 // grid moving as well ... in between shape transitions, it goes into little dots ... that cellular form ... then boom, boom, boom".
 //   cells    every chord change (2 bars): the figure dissolves into cells of dots over the last beat and a half, then three
 //            booms on beats 1, 2, 3 of the new chord snap it, a third at a time, into the new figure
 //   plate    the plate travels a slow figure-of-eight, bounces on the kick, is shoved on every boom, slams over at the drop
 //   field    drifts with the music's energy, sways with it, and every kick and boom sends a ring of light out from the plate
-//   chop     Summit's vocal hook (full, build, drop) pops the cells on every stab
+//   chop     Summit's vocal hook (full, build, drop; not the lift) pops the cells on every stab
 //   lift     the borrowed E major (bars 9-10 of every 16) adds a ring and warms the sand from pale steel to gold
-//   bell     every bell note rings a circle out from the centre (bloom, breakdown)
-//   silence  bar 72 (the build's last bar): the sand lies flat, one thrown vocal stab ripples across it; the drop flings it
+//   bell     every bell note rings a circle out from the centre (bloom, both breakdowns)
+//   silence  bar 80 (the build's last bar): the sand lies flat, one thrown vocal stab ripples across it; the drop flings it
 //            into cells and booms it into the biggest figure of the piece
 //   audio    the master's spectrum (tools/viz/analyze.py) lights the sand by radius, bass at the centre, treble at the rim
-const BPM = 128, BARS = 104, TAIL = 1.5;
-const QS = new URLSearchParams(location.search), VER = QS.get('v') === 'b' ? 'b' : 'a';   // ?v=b: version B's master
-const OFF = 0;                                                        // r8 starts on bar 1 (lag vs premaster within ±6 ms, under a fifth of a frame)
+const BPM = 128, BARS = 130, TAIL = 0;                    // r9 ends on its own 2-bar ring-out, so no tail
+const QS = new URLSearchParams(location.search);                      // one master since r9 (it replaced both A and B)
+const OFF = 0;                                                        // the masters start on bar 1 (mix_live.py trims the chain delay)
 const BG = '#16191d', PLATE = '#1c2026', FIELD_INK = '#e6d6ad';
 const COOL = [207, 216, 224], WARM = [233, 201, 160];                 // the sand: pale steel, gold at the lift
 const CX = 960, CY = 540, PR = 400, SR = 360;                         // plate rim radius; the sand's home radius
@@ -50,54 +50,54 @@ const lerp = (a, z, t) => a + (z - a) * t;
 const within = (b, a, z) => b >= a && b < z;
 function hash(a, b = 0, c = 0) { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 
-// ---------- the song, as data (patterns/12-aura.strudel.js, r8, bars counted from 0) ----------
+// ---------- the song, as data (patterns/12-aura.strudel.js, r9, bars counted from 0) ----------
 // [start, end, name, cutoff lo, cutoff hi] from arrange(): the pluck's filter sweep, section by section
 const SECTIONS = [[0, 8, 'air', 300, 900], [8, 16, 'bloom', 900, 1600], [16, 24, 'pulse', 1600, 2000], [24, 40, 'groove', 1900, 2400],
-  [40, 56, 'full', 2400, 3000], [56, 64, 'breakdown', 2600, 1000], [64, 72, 'build', 900, 4200], [72, 88, 'drop', 3200, 4200],
-  [88, 104, 'outro', 2400, 300]];
+  [40, 56, 'full', 2400, 3000], [56, 64, 'breakdown', 2600, 1000], [64, 72, 'breakdown', 1600, 2600], [72, 80, 'build', 900, 4200],
+  [80, 96, 'drop', 3200, 4200], [96, 104, 'lift', 3800, 4400], [104, 128, 'outro', 2400, 300], [128, 130, 'ringout', 300, 300]];
 const SPOKES = [4, 6, 5, 3, 4, 6, 5, 7];        // one per chord: Em9 · Cmaj9 · Gmaj9 · D/F# | E add9 · Cmaj9 · Am9 · Bsus4->B7
 const TUNE = [[0,0,71],[0,3,78],[0,6,76],[1,0,74],[1,6,76],[1,7,78],[2,0,79],[2,3,76],[2,6,74],[3,0,76],[4,0,74],[4,3,71],[4,6,74],
   [5,0,78],[5,4,79],[5,6,78],[6,0,76],[6,3,74],[6,6,69],[7,0,66],[8,0,80],[8,3,78],[8,6,76],[9,0,83],[9,4,80],[10,0,79],[10,3,76],
   [10,6,71],[11,0,74],[11,4,76],[12,0,72],[12,3,76],[12,6,81],[13,0,79],[13,4,76],[13,6,71],[14,0,69],[14,3,71],[14,6,76],[15,0,75],[15,4,78]];  // [bar in 16, 8th step, midi]
-const SILENT = [71, 72];                        // build's mask "<1!7 0>": the last bar, only the thrown stab on its downbeat
+const SILENT = [79, 80];                        // build's mask "<1!7 0>": the last bar, only the thrown stab on its downbeat
 const CHOP = [[2, 5, 8, 12], [2, 5, 10, 13]];   // the vocal hook's 16ths, alternating bars: "<[~ ~ x ~ ~ x ~ ~ x ~ ~ ~ x ~ ~ ~] [~ ~ x ~ ~ x ~ ~ ~ ~ x ~ ~ x ~ ~]>"
 const sec = (b) => SECTIONS.find(([a, z]) => b >= a && b < z) || SECTIONS[SECTIONS.length - 1];
 function light(b) { const [a, z, , lo, hi] = sec(b); return clamp(Math.log(lerp(lo, hi, clamp((b - a) / (z - a))) / 300) / Math.log(4400 / 300)); }
 // rings by section; the build climbs a ring per bar; the outro gives them back
 function rings(b) { const n = sec(b)[2];
-  if (n === 'build') return 2 + Math.min(5, Math.floor(b - 64));
-  if (n === 'outro') return Math.max(1, 5 - Math.floor((b - 88) / 3.2));
-  return { air: 1, bloom: 2, pulse: 2, groove: 3, full: 4, breakdown: 3, drop: 5 }[n]; }
+  if (n === 'build') return 2 + Math.min(5, Math.floor(b - 72));
+  if (n === 'outro') return Math.max(1, 5 - Math.floor((b - 104) / 4.8));
+  return { air: 1, bloom: 2, pulse: 2, groove: 3, full: 4, breakdown: 3, drop: 5, lift: 6, ringout: 1 }[n]; }
 // how much sand is on the plate (0..1): a dusting in the air, all of it from the pulse on, gone by the end
 function amount(b) { if (b < 8) return .3 + .35 * ease(b / 8); if (b < 16) return .65 + .35 * ease((b - 8) / 8);
-  if (b >= 88) return 1 - ease((b - 90) / 13); return 1; }
-const kickOn = (b) => within(b, 16, 56) || within(b, 72, 88) ? 1 : within(b, 88, 96) ? .5 : 0;   // r8: no kick in the build (Summit takes the low end away)
+  if (b >= 104) return 1 - ease((b - 106) / 22); return 1; }
+const kickOn = (b) => within(b, 16, 56) || within(b, 80, 104) ? 1 : within(b, 104, 112) ? .5 : 0;   // no kick in the breakdowns or the build (Summit takes the low end away)
 const silent = (b) => within(b, SILENT[0], SILENT[1]);
 // the vocal hook: how loud it is here, and how long since its last stab (in 16ths)
-function chopGain(b) { return within(b, 48, 56) || within(b, 72, 88) ? 1 : within(b, 64, 71) ? .45 + .55 * (b - 64) / 7 : 0; }
+function chopGain(b) { return within(b, 48, 56) || within(b, 80, 96) ? 1 : within(b, 72, 79) ? .45 + .55 * (b - 72) / 7 : 0; }
 function chopNow(b) { let best = 0;
   for (const bar of [Math.floor(b), Math.floor(b) - 1]) { const g = chopGain(bar); if (!g) continue;
     for (const st of CHOP[((bar % 2) + 2) % 2]) { const age = (b - bar - st / 16) * 16; if (age >= 0 && age < 6) best = Math.max(best, g * Math.exp(-age * .8)); } }
-  if (within(b, 71, 72)) best = Math.max(best, Math.exp(-(b - 71) * 16 * .35));   // the thrown stab
+  if (within(b, 79, 80)) best = Math.max(best, Math.exp(-(b - 79) * 16 * .35));   // the thrown stab
   return best; }
 // the lift: warmth 1 on the borrowed E major (chord 4 of 8), easing back to steel by the turn home
 function warmth(b) { const c = fr(b / 16) * 8; return c < 4 ? 0 : c < 6 ? ease((c - 4) * 3) : 1 - ease((c - 6) / 2) * .85; }
 function song(b) {
   const beat = fr(b * 4), ci = Math.floor(b / 2) % 8;
   const s = { b, ci, L: light(b), kick: silent(b) ? 0 : kickOn(b) * Math.exp(-beat * 6), warm: warmth(b), amt: amount(b), chop: chopNow(b),
-    roll: within(b, 64, 71) ? ease((b - 64) / 7) : 0, drop: b >= 72 && b < 74 ? Math.exp(-(b - 72) * 2.2) : 0, notes: [] };
-  // bell notes ringing now, [age in bars, midi, gain]: bloom and breakdown
+    roll: within(b, 72, 79) ? ease((b - 72) / 7) : 0, drop: b >= 80 && b < 82 ? Math.exp(-(b - 80) * 2.2) : 0, notes: [] };
+  // bell notes ringing now, [age in bars, midi, gain]: bloom and both breakdowns
   const loop = Math.floor(b / 16) * 16;
   for (const base of [loop - 16, loop]) for (const [br, st, m] of TUNE) { const t0 = base + br + st / 8, age = b - t0;
     if (age < 0 || age >= 2) continue;
-    const g = within(t0, 8, 16) ? 1 : within(t0, 56, 64) ? .9 : 0;
+    const g = within(t0, 8, 16) ? 1 : within(t0, 56, 72) ? .9 : 0;
     if (g) s.notes.push([age, m, g]); }
-  if (within(b, 71, 72)) s.notes.push([b - 71, 71, 1]);                // the thrown stab ripples across the flat sand
+  if (within(b, 79, 80)) s.notes.push([b - 79, 71, 1]);                // the thrown stab ripples across the flat sand
   return s;
 }
-// the figure: rings x spokes, plus a finer second mode that grows with the energy (full, build, drop)
+// the figure: rings x spokes, plus a finer second mode that grows with the energy (full, build, drop, lift)
 function mode(b) { const ci = Math.floor(b / 2) % 8, n = rings(b) + (ci >= 4 && ci <= 5 ? 1 : 0);
-  const n2 = sec(b)[2], c2 = { full: .15, build: .15, drop: .35 }[n2] || 0;
+  const n2 = sec(b)[2], c2 = { full: .15, build: .15, drop: .35, lift: .4 }[n2] || 0;
   return { n, m: SPOKES[ci], c2 }; }
 function fig(md, r, a) { return Math.cos(md.n * Math.PI * r) * Math.cos(md.m * a) + md.c2 * Math.cos((md.n + 2) * Math.PI * r) * Math.cos(2 * md.m * a); }
 // the transition: c = how far the sand has gone to cells (0 figure, 1 cells), tm = how much of the new figure is built,
@@ -106,7 +106,7 @@ function cells(b) { const c0 = Math.floor(b / 2) * 2, p = (b - c0) * 4;
   let tm = 1, bm = 0;
   if (p < 3) { tm = (Math.floor(p) + ease(fr(p) / .2)) / 3; bm = Math.exp(-fr(p) * 9); }
   let c = 1 - tm; if (p >= 6.5) c = Math.max(c, ease((p - 6.5) / 1));
-  const soft = kickOn(b) || chopGain(b) || b >= 72 ? 1 : .55;          // no drums yet: the booms are softer
+  const soft = kickOn(b) || chopGain(b) || within(b, 80, 104) ? 1 : .55;          // no drums yet: the booms are softer
   return { c, tm, bm: bm * soft, p }; }
 // one cell's state: the cells split into three groups, and each boom snaps one group whole into the figure (no half-formed
 // mush); they dissolve again one by one over the chord's last beat and a half
@@ -120,7 +120,7 @@ function jump(b) { const s = song(b), cs = cells(b);
 // where the plate is: a slow figure-of-eight, a bounce on the kick, a shove on every boom, frozen in the silence
 function plate(b) { if (silent(b)) b = SILENT[0];
   const s = song(b), cs = cells(b), n = sec(b)[2];
-  const A = ease((b - 6) / 6) * ({ air: .35, bloom: .55, breakdown: .6 }[n] ?? 1) * (n === 'outro' ? 1 - .8 * ease((b - 94) / 8) : 1);
+  const A = ease((b - 6) / 6) * ({ air: .35, bloom: .55, breakdown: .6 }[n] ?? 1) * (n === 'outro' || n === 'ringout' ? 1 - .8 * ease((b - 112) / 14) : 1);
   const sa = hash(Math.floor(b / 2), 91) * TAU;
   const ox = A * (250 * Math.sin(b * TAU / 16) + 40 * Math.sin(b * TAU / 5.3) + 24 * cs.bm * Math.cos(sa));
   const oy = A * (52 * Math.sin(b * TAU / 10.7 + 1) + 14 * cs.bm * Math.sin(sa) - 9 * s.kick);
@@ -176,11 +176,11 @@ function breakAmt(b, s, cs) { const n = sec(b)[2];
   let v = .55 * s.kick + 2.2 * s.drop + .9 * s.roll + .7 * s.chop + .6 * cs.bm;
   if (n === 'air' || n === 'bloom') v += .25 + .2 * Math.sin(b * Math.PI / 2);               // no drums yet: the cells breathe
   if (n === 'breakdown') v += .55 + .35 * Math.sin(b * Math.PI / 4);                        // the cells float apart while the bell has the room
-  if (n === 'outro') v += 1.6 * ease((b - 90) / 12);                                         // they drift away as the sand thins
+  if (n === 'outro' || n === 'ringout') v += 1.6 * ease((b - 106) / 20);                                         // they drift away as the sand thins
   return v; }
 function frame(b) {
   const s = song(b), spec = spectrum(b), still = silent(b), cs = cells(b), P = plate(b), PRs = PR * P.sc;
-  const fade = 1 - ease((b - 103) / 1.5);                             // the last bar and the tail fade to the plate alone
+  const fade = 1 - ease((b - 128) / 2);                               // the ring-out fades to the plate alone
   const t = b * 240 / BPM; let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;    // seconds; the music's energy now
   cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, 1920, 1080);
   // the field: thins around the plate wherever it is, sways with the energy, rings of light run out on the kick and the booms
@@ -278,7 +278,7 @@ function check(step = 1 / 8) { const bad = [], say = (b, m) => { if (bad.length 
 // ---------- clocks: ?bar=N holds one frame; otherwise the master plays and the picture follows its time ----------
 const go = document.getElementById('go');
 window.viz = { BPM, BARS, TAIL, frame, song, mode, jump, cells, plate, check, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: false };
-fetch(VER === 'b' ? 'aura-b-spectrum.json' : 'aura-spectrum.json').then((r) => r.json()).then((j) => {
+fetch('aura-spectrum.json').then((r) => r.json()).then((j) => {
     SPEC = { fps: j.fps, frames: j.frames, d: Uint8Array.from(atob(j.data), (ch) => ch.charCodeAt(0)) };
     CUM = new Float32Array(SPEC.frames); for (let i = 1; i < SPEC.frames; i++) { const b = (i / SPEC.fps - OFF) * BPM / 240;
       CUM[i] = CUM[i - 1] + (silent(b) ? 0 : (.8 + 4.5 * energy(i)) / SPEC.fps); } })
@@ -289,7 +289,7 @@ fetch(VER === 'b' ? 'aura-b-spectrum.json' : 'aura-spectrum.json').then((r) => r
     frame(3);
     go.onclick = () => {
       go.remove();
-      const audio = new Audio(QS.get('audio') || (VER === 'b' ? '/renders/aura-b-r8-master.mp3' : '/renders/aura-r8-master.mp3')); window.viz.audio = audio;
+      const audio = new Audio(QS.get('audio') || '/renders/aura-r9-master.mp3'); window.viz.audio = audio;
       const from = +QS.get('from') || 0; let t0 = null;
       audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM + OFF; audio.play(); });
       audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });
