@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura (Festival Version) · neurons, typed</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1114; overflow: hidden; }
+  canvas { position: fixed; inset: 0; margin: auto; aspect-ratio: 16 / 9; width: 100vw; height: auto; max-height: 100vh; display: block; }
+  @media (min-aspect-ratio: 16/9) { canvas { width: auto; height: 100vh; } }
+  #go { position: fixed; inset: 0; margin: auto; width: 9rem; height: 3rem; font: 700 1rem ui-monospace, Menlo, monospace; letter-spacing: .25em;
+        color: #e6d6ad; background: #16191d; border: 2px solid #e6d6ad; border-radius: 4px; cursor: pointer; }
+  #go:hover, #go:focus-visible { background: #22262c; outline: 2px solid #e6d6ad; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080" aria-label="Aura Festival Version visualiser: neurons grow across the whole screen, typed in character by character as syntax-coloured code on every sixteenth note, firing on the kick, over a field of vertical hatching"></canvas>
+<button id="go">PLAY</button>
+<script>
+// Aura (Festival Version) · neurons, typed. Joona: "have it be neurons growing by bits that you are coding with the syntax
+// and you can do it at a rapid pace so it matches the synths" (full screen, the glyph grid staying).
+// Neurons grow across a 192 x 72 grid of characters. Every branch is a line of code, typed one character per cell with a
+// block cursor at each growing tip, syntax-coloured (keywords pink, calls gold, numbers cyan, punctuation steel). The typing
+// comes in a burst on every 16th note, the arps' own rhythm, at a rate set by the section. A network lives for 4 or 8 bars,
+// then is backspaced away while the next one is typed over it. Where branches meet, a synapse (*). On every kick a spike
+// runs out from each cell body along its branches; bell notes fire single neurons; the vocal stabs make the network flicker.
+// Underneath, always, the lovespark.love vertical hatching. Every frame is a pure function of the bar: the networks are grown
+// once at load from fixed seeds, and a frame only decides how much of each is typed so far.
+const BPM = 128, BARS = 138, TAIL = 0;
+const QS = new URLSearchParams(location.search), OFF = 0;
+const BG = '#13161a';
+const SW = 1920, SH = 1080, GW = 10, GH = 15, COLS = SW / GW, ROWS = SH / GH, NCELL = COLS * ROWS;
+const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+const PI = Math.PI, TAU = PI * 2, fr = (v) => v - Math.floor(v);
+const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
+const ease = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
+const lerp = (a, z, t) => a + (z - a) * t;
+const within = (b, a, z) => b >= a && b < z;
+function hash(a, b = 0, c = 0) { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+// ---------- the song (patterns/12-aura-festival.strudel.js, bars from 0) ----------
+const TUNE = [[0,0,71],[0,3,78],[0,6,76],[1,0,74],[1,6,76],[1,7,78],[2,0,79],[2,3,76],[2,6,74],[3,0,76],[4,0,74],[4,3,71],[4,6,74],
+  [5,0,78],[5,4,79],[5,6,78],[6,0,76],[6,3,74],[6,6,69],[7,0,66],[8,0,80],[8,3,78],[8,6,76],[9,0,83],[9,4,80],[10,0,79],[10,3,76],
+  [10,6,71],[11,0,74],[11,4,76],[12,0,72],[12,3,76],[12,6,81],[13,0,79],[13,4,76],[13,6,71],[14,0,69],[14,3,71],[14,6,76],[15,0,75],[15,4,78]];
+const CHOP = [[2, 5, 8, 12], [2, 5, 10, 13]];
+const SILENT = [[63, 64], [87, 88]];            // one thrown stab, nothing else: the typing stops
+const kickOn = (b) => within(b, 16, 24) ? .7 : within(b, 24, 40) || within(b, 64, 80) || within(b, 88, 112) ? 1 : within(b, 112, 120) ? .5 : 0;
+const silentOf = (b) => SILENT.find(([a, z]) => b >= a && b < z);
+function chopGain(bar) { return within(bar, 64, 80) || within(bar, 88, 104) ? 1 : within(bar, 56, 63) ? .45 + .55 * (bar - 56) / 7 : 0; }
+const stabGain = (b) => within(b, 88, 104) ? 1 : within(b, 104, 112) ? .8 : 0;
+function warmth(b) { const c = fr(b / 16) * 8; return c < 4 ? 0 : c < 6 ? ease((c - 4) * 3) : 1 - ease((c - 6) / 2) * .85; }
+function song(b) { const still = !!silentOf(b);
+  const s = { kick: still ? 0 : kickOn(b) * Math.exp(-fr(b * 4) * 6), warm: warmth(b), chop: 0, chopSeed: 0, stab: still ? 0 : stabGain(b) * Math.exp(-fr(b * 4 + .5) * 5),
+    drop: within(b, 64, 66) ? Math.exp(-(b - 64) * 2.2) : within(b, 88, 90) ? 1.25 * Math.exp(-(b - 88) * 2.2) : 0, notes: [] };
+  for (const bar of [Math.floor(b), Math.floor(b) - 1]) { const g = chopGain(bar); if (!g) continue;
+    for (const st of CHOP[((bar % 2) + 2) % 2]) { const age = (b - bar - st / 16) * 16, v = g * Math.exp(-age * .8); if (age >= 0 && v > s.chop) { s.chop = v; s.chopSeed = bar * 16 + st; } } }
+  const loop = Math.floor(b / 16) * 16;
+  for (const base of [loop - 16, loop]) for (const [br, st, m] of TUNE) { const t0 = base + br + st / 8, age = b - t0; if (age < 0 || age >= 1) continue;
+    if (within(t0, 8, 56) || within(t0, 104, 112)) s.notes.push([age, m]); }
+  return s; }
+
+// ---------- the master's spectrum ----------
+let SPEC = null, CUM = null;
+function spectrum(b) { const out = new Float32Array(32); if (!SPEC) return out;
+  const f = clamp((b * 240 / BPM + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f), t = f - i;
+  for (let k = 0; k < 32; k++) out[k] = Math.pow(lerp(SPEC.d[i * 32 + k], SPEC.d[(i + 1) * 32 + k], t) / 255, 1.6);
+  return out; }
+function energy(i) { let e = 0; for (let k = 0; k < 32; k++) e += SPEC.d[i * 32 + k]; return e / (32 * 255); }
+function fieldTime(b) { const sx = b * 240 / BPM; if (!CUM) return sx * .8;
+  const f = clamp((sx + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f); return lerp(CUM[i], CUM[i + 1], f - i); }
+
+// ---------- the hatching (lovespark.love) ----------
+function vhash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = vhash(xi, yi), b = vhash(xi + 1, yi), c = vhash(xi, yi + 1), d = vhash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+function hatchField(x, y, t) { return .65 * vnoise(x * .11 + t * .06, y * .022 - t * .09) + .35 * vnoise(x * .31 - t * .04, y * .07 + t * .05); }
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], HRAMP = ['╷', '┆', '╎', '¦', '│', '┃', '║'];
+
+// ---------- glyphs: printable ASCII, the cursor block, the hatching; a row per colour ----------
+const GLY = []; for (let c = 33; c < 127; c++) GLY.push(String.fromCharCode(c));
+const BLOCK = GLY.length; GLY.push('█'); const HAT = GLY.length; HRAMP.forEach((ch) => GLY.push(ch));
+// colour rows: 0 identifier (per network: see IDENT) · 1 keyword · 2 number · 3 punctuation · 4 call · 5 violet · 6 cyan · 7 hot white · 8 hatching ink
+const COLS_RGB = [[236, 230, 218], [255, 118, 170], [112, 214, 232], [150, 162, 178], [240, 196, 140], [168, 148, 255], [112, 214, 232], [255, 250, 240], [230, 214, 173]];
+const C_ID = 0, C_KW = 1, C_NUM = 2, C_PUN = 3, C_CALL = 4, C_HOT = 7, C_INK = 8, IDENT = [0, 4, 6, 5];   // identifier colour by network: paper, gold, cyan, violet
+const TW = 12, TH = 18, atlas = document.createElement('canvas'); atlas.width = GLY.length * TW; atlas.height = COLS_RGB.length * TH;
+{ const a = atlas.getContext('2d'); a.textBaseline = 'middle'; a.textAlign = 'center';
+  COLS_RGB.forEach((rgb, row) => { a.fillStyle = `rgb(${rgb.join(',')})`;
+    GLY.forEach((ch, g) => { a.font = g >= HAT ? '13px ui-monospace, "SF Mono", Menlo, monospace' : '700 14px Menlo, Consolas, "DejaVu Sans Mono", monospace';
+      a.globalAlpha = g >= HAT ? .55 + .45 * (g - HAT + 1) / HRAMP.length : 1; a.fillText(ch, g * TW + TW / 2, row * TH + TH / 2 + (g === BLOCK ? 0 : 1)); }); }); }
+
+// ---------- the code the neurons are written in ----------
+const CODE = ['def grow(tip):', 'for d in dendrites:', 'if v > theta: fire()', 'axon.extend(dt)', 'w += eta * pre * post', 'return sum(w * x)', 'while alive: branch()',
+  'synapse.bind(a, b)', 'class Neuron(Cell):', 'yield spike(t)', 'v = v * 0.98 + I', 'lambda x: max(0, x)', 'import aura', 'soma.integrate(inputs)', 'const tips = [...buds]',
+  'tips.map(grow)', 'await signal(128)', 'let aura = 0x1F', 'if (tip.free) tip.split()', 'for (const s of synapses) s.fire()', 'return self.v > 1.0', 'tip.angle += noise(t)',
+  'def learn(x, y):', 'net.connect(i, j, w)', 'while True: listen()', 'phase = t % 16', 'dendrite.push(bit)', 'elif near(other): bind()', 'export const E = 2.718'];
+const KEYWORDS = new Set(['def', 'for', 'in', 'if', 'return', 'while', 'class', 'yield', 'lambda', 'import', 'const', 'await', 'let', 'elif', 'of', 'export', 'True', 'self']);
+// each snippet as [char code, colour class], spaces dropped (a branch has no gaps)
+const TOK = CODE.map((line) => { const out = [], re = /([A-Za-z_][A-Za-z_0-9]*)|(0x[0-9A-Fa-f]+|\d+\.?\d*)|(\s+)|(.)/g; let m;
+  while ((m = re.exec(line))) { if (m[3]) continue; const cls = m[1] ? (KEYWORDS.has(m[1]) ? C_KW : line[re.lastIndex] === '(' ? C_CALL : C_ID) : m[2] ? C_NUM : C_PUN;
+    for (const ch of m[0]) out.push([ch.charCodeAt(0) - 33, cls]); } return out; });
+
+// ---------- the networks: [start bar, end bar, typing rate (cells per tip per 16th), neurons, most tips at once] ----------
+const NETS = [[0, 8, .8, 2, 6], [8, 16, 1.1, 3, 7], [16, 20, 1.5, 4, 9], [20, 24, 1.5, 4, 9], [24, 28, 2, 5, 10], [28, 32, 2, 5, 10], [32, 36, 2, 5, 10], [36, 40, 2, 5, 10],
+  [40, 48, 1.1, 3, 8], [48, 56, 1.5, 4, 9], [56, 63, 2.4, 6, 9], [64, 68, 3, 6, 11], [68, 72, 3, 6, 11], [72, 76, 3, 6, 11], [76, 80, 3, 6, 11], [80, 87, 1.2, 3, 8],
+  [88, 92, 3.4, 7, 11], [92, 96, 3.4, 7, 11], [96, 100, 3.4, 7, 11], [100, 104, 3.4, 7, 11], [90, 94, 3, 5, 7], [94, 98, 3, 5, 7], [98, 102, 3, 5, 7],   // drop 2: a second network, two bars out of step
+  [104, 108, 4, 8, 11], [108, 112, 4, 8, 11], [102, 106, 3.4, 5, 7], [106, 110, 3.4, 5, 7], [112, 120, 1.5, 4, 8], [120, 134, 1, 3, 5]];
+const PRUNE = (n) => (n[1] - n[0] >= 7 ? 1.5 : 1);                  // bars a network takes to be backspaced away once the next has begun
+const SOMA = ['/^\\', '(@)', '\\_/'];
+function buildNet(def, id) { const [b0, b1, rate, K, maxTips] = def, ticks = Math.ceil((b1 - b0) * 16 * rate) + 2, occ = new Int32Array(NCELL).fill(-1);
+  let hc = 0; const rnd = () => hash(1000 + id, hc++, 17), cells = [], tips = [], somas = [];   // cell: [grid index, tick typed, glyph, colour class, neuron, tip]
+  const put = (c, r, t, g, cls, n, tip) => { const i = r * COLS + c; if (occ[i] >= 0) return false; occ[i] = cells.length; cells.push([i, t, g, cls, n, tip]); return true; };
+  const newTip = (x, y, th, t, n) => { tips.push({ x, y, th, n, born: t, died: 1e9, last: -1, snip: Math.floor(rnd() * TOK.length), at: 0 }); };
+  for (let k = 0; k < K; k++) { let x = 0, y = 0;
+    for (let tries = 0; tries < 30; tries++) { x = 14 + rnd() * (COLS - 28); y = 7 + rnd() * (ROWS - 14);
+      if (somas.every(([sx, sy]) => Math.hypot((x - sx) * GW, (y - sy) * GH) > 330) && !(x < 44 && y > 52)) break; }
+    x = Math.round(x); y = Math.round(y); somas.push([x, y]);
+    for (let r = -1; r <= 1; r++) for (let c = -1; c <= 1; c++) put(x + c, y + r, Math.abs(r) + Math.abs(c), SOMA[r + 1].charCodeAt(c + 1) - 33, C_CALL, k, -1);
+    const nb = 4 + Math.floor(rnd() * 3), a0 = rnd() * TAU; for (let q = 0; q < nb; q++) { const th = a0 + q / nb * TAU + (rnd() - .5) * .5; newTip(x + Math.cos(th) * 2.2, y + Math.sin(th) * 1.5, th, 2, k); } }
+  const minTips = Math.min(maxTips - 1, K * 2);
+  for (let t = 3; t <= ticks; t++) { let alive = 0; for (const tp of tips) if (tp.died > t) alive++;
+    const n0 = tips.length;
+    for (let q = 0; q < n0; q++) { const tp = tips[q]; if (tp.died <= t || tp.born >= t) continue;
+      tp.th += (rnd() - .5) * .6; tp.x += Math.cos(tp.th); tp.y += Math.sin(tp.th) * (GW / GH);
+      const c = Math.round(tp.x), r = Math.round(tp.y);
+      if (c < 1 || c >= COLS - 1 || r < 1 || r >= ROWS - 1) { tp.died = t; alive--; continue; }
+      const i = r * COLS + c; if (i === tp.last) continue;
+      if (occ[i] >= 0) { const hit = cells[occ[i]]; if (hit[5] !== q) { if (hit[5] >= 0) { hit[2] = 9; hit[3] = C_HOT; } tp.died = t; alive--; } continue; }   // a meeting: a synapse, '*'
+      const tok = TOK[tp.snip][tp.at]; put(c, r, t, tok[0], tok[1], tp.n, q); tp.last = i;
+      if (++tp.at >= TOK[tp.snip].length) { tp.at = 0; tp.snip = Math.floor(rnd() * TOK.length); }
+      if (alive < maxTips && rnd() < .055) { newTip(tp.x, tp.y, tp.th + (rnd() < .5 ? 1 : -1) * (.5 + rnd() * .7), t, tp.n); alive++; }
+      else if (alive > minTips && rnd() < .007) { tp.died = t; alive--; } }
+    while (alive < minTips && cells.length > 9) { const src = cells[Math.floor(rnd() * cells.length)], i = src[0]; newTip(i % COLS, Math.floor(i / COLS), rnd() * TAU, t, src[4]); alive++; } }
+  return { b0, b1, rate, K, ticks, cells, somas, born: tips.map((tp) => tp.born), died: tips.map((tp) => tp.died), id, prune: PRUNE(def) }; }
+const NET = NETS.map(buildNet);
+// how much of a network is typed at bar b: a burst at the start of every 16th, then the hand rests until the next
+function typed(net, b) { const s = silentOf(b); if (s) b = s[0]; const n16 = (Math.min(b, net.b1) - net.b0) * 16; return n16 <= 0 ? 0 : net.rate * (Math.floor(n16) + ease(fr(n16) / .4)) + 2; }
+
+// ---------- the grid ----------
+const XC = new Float32Array(NCELL), YR = new Float32Array(NCELL), BAY = new Float32Array(NCELL), RAD = new Float32Array(NCELL), BAND = new Uint8Array(NCELL), TMASK = new Float32Array(NCELL), INTITLE = new Uint8Array(NCELL);
+const TITLE = { x: 96, y: 930, w: 260, h: 100 };
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const i = r * COLS + c, px = c * GW + GW / 2, py = r * GH + GH / 2;
+  XC[i] = px / 9; YR[i] = py / 15; BAY[i] = (BAYER[(r & 3) * 4 + (c & 3)] / 16 - .5) * .22; RAD[i] = Math.hypot(px - SW / 2, py - SH / 2) / (SH / 2); BAND[i] = Math.min(31, Math.abs(px - SW / 2) / (SW / 2) * 30 | 0);
+  const ddx = Math.max(TITLE.x - 26 - px, 0, px - (TITLE.x + TITLE.w + 26)), ddy = Math.max(TITLE.y - 78 - py, 0, py - (TITLE.y + 66)); TMASK[i] = 1 - ease(Math.hypot(ddx, ddy) / 70);
+  INTITLE[i] = px > TITLE.x - 26 && px < TITLE.x + TITLE.w + 26 && py > TITLE.y - 78 && py < TITLE.y + 66 ? 1 : 0; }
+const STAMP = new Int32Array(NCELL); let stampNo = 0;
+const titleAlpha = (b) => ease(b / 1.5) * (1 - ease((b - 6) / 2));
+
+function frame(b) {
+  const s = song(b), spec = spectrum(b), still = !!silentOf(b), t = b * 240 / BPM, ta = titleAlpha(b), tfull = ease(ta * 1.7);
+  let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;
+  const fadeAll = (1 - .85 * ease((b - 136.6) / 1.4)) * (b < 1 ? .25 + .75 * ease(b) : 1), beat16 = Math.floor(b * 16), kAge = fr(b * 4), kOn = still ? 0 : kickOn(b);
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, SW, SH);
+  stampNo++; let nfig = 0, nhatch = 0, tInk = 0, total = 0;
+  const shake = still ? 0 : 2.5 * s.kick + 6 * s.drop;
+  for (const net of NET) { const fadeEnd = net.b1 + net.prune; if (b < net.b0 || b >= fadeEnd) continue;
+    const T = typed(net, b), pr = b > net.b1 ? ease((Math.floor((b - net.b1) * 16) + ease(fr((b - net.b1) * 16) / .4)) / (net.prune * 16)) : 0;   // backspacing, on the 16ths too
+    const P = net.ticks * (1 - pr) + 2 * (1 - pr), old = b > net.b1, base = (old ? .5 : .82) * (still ? .55 : 1), idRow = IDENT[net.id % IDENT.length];
+    const w0 = kAge * 64, w1 = (kAge + 1) * 64, cells = net.cells, born = net.born, died = net.died;
+    for (let q = 0; q < cells.length; q++) { const ce = cells[q], tt = ce[1]; if (tt > T || tt > P) continue;
+      const i = ce[0], age = T - tt, tip = ce[5]; let g = ce[2], row = ce[3] === C_ID ? idRow : ce[3], al = base;
+      if (!old && !still) { if (age < 1 && tip >= 0 && died[tip] > T) { g = BLOCK; row = C_HOT; al = 1; }                   // the cursor at a growing tip
+        else if (age < 5) { al = 1; if (age < 2.5) row = C_HOT; } }                                                           // just typed: still bright
+      if (old && P - tt < 1.5) { g = BLOCK; row = C_PUN; }                                                                    // the backspace's cursor
+      if (kOn) { let d = w0 - tt; if (d < 0 || d >= 7) d = w1 - tt; if (d >= 0 && d < 7) { const v = (1 - d / 7) * kOn; al = Math.min(1, al + .55 * v); if (v > .45) row = C_HOT; } }   // the spike
+      for (let n = 0; n < s.notes.length; n++) { if ((s.notes[n][1] + net.id) % net.K !== ce[4]) continue; const d = s.notes[n][0] * 150 - tt; if (d >= 0 && d < 9) { al = Math.min(1, al + .6 * (1 - d / 9)); row = C_HOT; } }
+      if (still) { const d = (b - silentOf(b)[0]) * 90 - tt; if (d >= 0 && d < 8) { al = Math.min(1, al + .7 * (1 - d / 8)); row = C_HOT; } }   // the thrown stab: one slow spike through the stopped network
+      if (s.chop > .25 && hash(i, s.chopSeed, 3) < .22 * s.chop) { row = C_KW; al = 1; }                                       // the vocal stab: a pink flicker
+      if (s.stab > .2 && hash(i, beat16, 4) < .3 * s.stab) al = 1;
+      if (ce[2] === 9 && ce[3] === C_HOT) al = Math.min(1, al * (.7 + .6 * hash(i, beat16 >> 1, 6)));                         // synapses twinkle
+      al *= (.72 + .45 * spec[BAND[i]]) * fadeAll * (1 - tfull * TMASK[i]); if (al > 1) al = 1; if (al < .02) continue;
+      const px = (i % COLS) * GW + GW / 2, py = Math.floor(i / COLS) * GH + GH / 2, dx = shake ? (hash(i, 21) - .5) * 2 * shake : 0, dy = shake ? (hash(i, 22) - .5) * 2 * shake : 0;
+      cx.globalAlpha = al; cx.drawImage(atlas, g * TW, row * TH, TW, TH, px - TW / 2 + dx, py - TH / 2 + dy, TW, TH);
+      if (STAMP[i] !== stampNo) { STAMP[i] = stampNo; nfig++; } total++; if (INTITLE[i] && al > tInk) tInk = al; } }
+  // the hatching underneath, wherever no character sits: it drifts with the music's energy and rings on the kick
+  const ft = fieldTime(b), fa = (.2 + .13 * s.kick + .14 * s.drop + .08 * s.chop + .09 * s.stab) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fadeAll * (still ? .7 : 1);
+  const kStr = kOn * (1 - kAge) * .5 * Math.min(1, kAge * 12), kR = .08 + 2.1 * kAge, sway = still ? 0 : 1.5 + 5 * E;
+  for (let i = 0; i < NCELL; i++) { if (STAMP[i] === stampNo) continue;
+    const ring = kStr * Math.exp(-(((RAD[i] - kR) / .07) ** 2));
+    let v = hatchField(XC[i] + Math.sin(YR[i] * .09 + ft * 1.7) * sway, YR[i], ft) + ring; v = v * 1.3 - .06 + BAY[i];
+    const g = v >= 1 ? 6 : Math.floor(v * 8) - 1; if (g < 0) continue;
+    const al = Math.min(1, fa * (1 + 1.6 * ring)) * (1 - tfull * TMASK[i]); cx.globalAlpha = al;
+    cx.drawImage(atlas, (HAT + g) * TW, C_INK * TH, TW, TH, (i % COLS) * GW + GW / 2 - TW / 2, Math.floor(i / COLS) * GH + GH / 2 - TH / 2, TW, TH);
+    nhatch++; if (INTITLE[i] && al > tInk) tInk = al; }
+  window.viz.stats = { fig: nfig / NCELL, hatch: nhatch / NCELL, titleInk: tInk, ta, chars: total };
+  if (ta > 0) { cx.globalAlpha = ta * .9; cx.fillStyle = '#e6d6ad'; cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';
+    cx.font = '700 56px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('A U R A', TITLE.x, TITLE.y);
+    cx.globalAlpha = ta * .6; cx.font = '400 22px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('Bvby Ash', TITLE.x + 4, TITLE.y + 40); }
+  cx.globalAlpha = 1;
+}
+
+// ---------- layout check: run viz.check() in the console, or tools/viz/check_layout.mjs aura-neurons ----------
+// Counts what lands on the canvas. The neurons must be there and must not fill the frame; the hatching must stay on screen;
+// no glyph under the title; and the typing must keep pace: in every bar with music, the picture must change on at least
+// 12 of its 16 sixteenth notes (a network that finishes early would leave the screen standing still).
+function check() { const bad = [], say = (b, m) => { if (bad.length < 40) bad.push(`bar ${(b + 1).toFixed(2)}: ${m}`); }, pct = (v) => (v * 100).toFixed(1) + '%';
+  for (let bar = 0; bar < BARS; bar++) { let moved = 0, prev = -1;
+    for (let k = 0; k < 16; k++) { const b = bar + (k + .7) / 16; frame(b); const st = window.viz.stats;
+      if (st.chars !== prev) moved++; prev = st.chars;
+      if (k % 4) continue;
+      if (b >= 1.5 && b < 133 && st.fig < .008) say(b, `the neurons are missing (${pct(st.fig)} of the grid)`);
+      if (st.fig > .4) say(b, `the neurons fill the frame (${pct(st.fig)})`);
+      if (b < 137 && st.hatch < .05) say(b, `the hatching has left the screen (${pct(st.hatch)})`);
+      if (st.ta > .6 && st.titleInk > .2) say(b, `glyphs are painted under the title (alpha ${st.titleInk.toFixed(2)})`); }
+    if (bar < 134 && !SILENT.some(([a]) => a === bar) && moved < 12) say(bar, `the typing stalls: the picture changed on only ${moved} of 16 sixteenths`); }
+  return bad; }
+
+const go = document.getElementById('go');
+window.viz = { BPM, BARS, TAIL, frame, song, check, NET, stats: null, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: false };
+fetch('aura-festival-spectrum.json').then((r) => r.json()).then((j) => {
+    SPEC = { fps: j.fps, frames: j.frames, d: Uint8Array.from(atob(j.data), (ch) => ch.charCodeAt(0)) };
+    CUM = new Float32Array(SPEC.frames); for (let i = 1; i < SPEC.frames; i++) { const b = (i / SPEC.fps - OFF) * BPM / 240;
+      CUM[i] = CUM[i - 1] + (silentOf(b) ? 0 : (.8 + 4.5 * energy(i)) / SPEC.fps); } })
+  .catch((e) => console.error('no spectrum file: the field will not follow the music', e))
+  .finally(() => {
+    window.viz.ready = true;
+    if (QS.has('bar')) { go.remove(); frame(+QS.get('bar')); return; }
+    frame(30);
+    go.onclick = () => {
+      go.remove();
+      const audio = new Audio(QS.get('audio') || '/renders/aura-festival-r1-master.mp3'); window.viz.audio = audio;
+      const from = +QS.get('from') || 0; let t0 = null;
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM + OFF; audio.play(); });
+      audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });
+      const loop = (t) => { const sx = t0 === null ? audio.currentTime - OFF : (t - t0) / 1000; frame(Math.min(sx * BPM / 240, BARS - .001)); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    };
+  });
+</script>
+</body>
+</html>
