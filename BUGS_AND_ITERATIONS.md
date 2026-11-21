@@ -409,3 +409,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error at any save. Because the muted pane no longer evaluates pushes, checks now fetch `/patterns/live.strudel.js` and evaluate it in the pane without playing (`repl.evaluate(code, false)`). Per section: air and bloom have 0 drum events; pulse 64 kicks + 128 shaker; groove adds 32 claps, 256 hats/shaker, 76 rims, 16 toms; full adds 64 open hats and 1 crash. Pluck cutoff measured at 300, 700, 1400, 1900, 2400 Hz at each section start and 2998 at bar 80. 0 notes outside their bar's chord across all 80 bars.
 - **Not verified:** how it sounds in his browser; his listen.
 - RSI: 4 saves, 5 checks -> 1 check lost to the muted pane not evaluating -> checks now evaluate the saved file themselves.
+
+## ITER-042 (2026-11-21): track 12 bass
+- **Asked:** "Yes, add bass. this is beautiful."
+- **Done:** a bass that follows all eight chords (roots E, C, G, F# under D/F#, E, C, A, B). Bloom: a long sine root per bar swelling in under the air. Pulse, groove, full: a John Summit-style rolling line of 16ths off the kick, on roots with a chord tone (the 5th, or A over F#) and an octave as the fills, two fill rhythms alternating. Sine for the weight plus a driven saw an octave up; quiet and dark in pulse (cutoff 260 Hz), standard in groove, brighter in full (520 Hz). The kick now ducks the bass too (`duckorbit("2:3:5")`).
+- **Bug caught before commit:** one fill landed on 16th 12, beat 4, on top of the kick (48 notes across the three bass sections). Found by checking every bass onset against the quarter-note grid; moved to 16th 11. After: 0 bass notes on a kick.
+- **Verified:** no eval error; bass notes per section: air 0, bloom 16, pulse/groove/full 256 each; 0 notes outside their bar's chord across all 80 bars.
+- **Not verified:** how it sounds; his listen.
+- RSI: 2 saves, 2 checks -> 1 save spent on the beat-4 fill -> bass-on-kick check now runs with the chord check on every bass save.

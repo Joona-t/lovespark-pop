@@ -43,9 +43,29 @@ const pad = chords.s("sawtooth").unison(5).detune(.28)
   .lpf(saw.range(600, 2600).slow(16)).lpq(1)
   .gain(.16).room(.85).size(.95).orbit(5)
 
+// ---- the bass: follows every chord. Roots under the slash chord D/F# take the F# ----
+const roots = note("<e1!2 c2!2 g1!2 fs1!2 e1!2 c2!2 a1!2 b1!2>")
+const uppers = note("<b1!2 g1!2 d2!2 a1!2 b1!2 g1!2 e2!2 fs2!2>")    // a chord tone above each root (the 5th; A over F#)
+
+// bloom: one long sine root per bar, swelling in, the warmth under the air
+const drone = roots.s("sine").attack(1.2).decay(.5).sustain(.7).release(2).lpf(220).gain(.32).orbit(3)
+
+// Summit's rolling line: 16ths off the kick, root notes, a chord tone and an octave as the fills.
+// Two bars of rhythm alternate so the fill changes every bar.
+const rolling = stack(
+  roots.struct("[~ x ~ x ~ ~ x ~ ~ x ~ ~ ~ x ~ ~]"),
+  uppers.struct("<[~ ~ ~ ~ ~ ~ ~ ~ ~ ~ x ~ ~ ~ ~ x] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ x x ~ ~ ~ ~]>"),
+  roots.add(note(12)).struct("<[~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ x x]>"))
+// a clean sine for the weight, a driven saw an octave up for the note you hear on small speakers
+const bass = (cut = 380, bite = .36) => stack(
+  rolling.s("sine").attack(.002).decay(.16).sustain(0).release(.03).gain(.8),
+  rolling.add(note(12)).s("sawtooth")
+    .lpf(cut).lpq(5).ftype("ladder").lpattack(.001).lpenv(3).lpdecay(.07).lpsustain(0)
+    .attack(.001).decay(.13).sustain(0).release(.03).shape(.35).gain(bite)).orbit(3)
+
 // ---- drums, layer 1: the kick. 909, four on the floor, ducks the pluck and the pad so the synths breathe with it ----
 const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
-  .orbit(9).duckorbit("2:5").duckattack(.2).duckdepth(.7)
+  .orbit(9).duckorbit("2:3:5").duckattack(.2).duckdepth(.7)
 
 // ---- drums, layer 2: Summit's groove. Clap on 2 and 4, shuffled 16th hats, open hat on every off-beat ----
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
@@ -64,8 +84,8 @@ const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.
 // ---- the arrangement: 80 bars. The synths hold the room alone, then the drums arrive one by one ----
 arrange(
   [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],                           // air: pad, a whisper of pluck
-  [16, stack(pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, still no drums
-  [16, stack(kick.gain(.42), shaker, pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick and the shaker
-  [16, stack(kick.gain(.54), clap, hats, rim, tom, pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, pad, glass, pluck(2400, 3000))], // full: everything
+  [16, stack(drone, pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, a low drone, still no drums
+  [16, stack(kick.gain(.42), shaker, bass(260, .18), pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick, the shaker, the bass rolling in quietly
+  [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), pad, glass, pluck(2400, 3000))], // full: everything
 )
