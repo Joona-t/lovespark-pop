@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura · sand that sings</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1114; overflow: hidden; }
+  canvas { position: fixed; inset: 0; margin: auto; aspect-ratio: 16 / 9; width: 100vw; height: auto; max-height: 100vh; display: block; }
+  @media (min-aspect-ratio: 16/9) { canvas { width: auto; height: 100vh; } }
+  #go { position: fixed; inset: 0; margin: auto; width: 9rem; height: 3rem; font: 700 1rem ui-monospace, Menlo, monospace; letter-spacing: .25em;
+        color: #e6d6ad; background: #16191d; border: 2px solid #e6d6ad; border-radius: 4px; cursor: pointer; }
+  #go:hover, #go:focus-visible { background: #22262c; outline: 2px solid #e6d6ad; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080" aria-label="Aura visualiser: glyph sand on a round dark plate gathers into ring-and-spoke patterns set by each chord, over a drifting field of vertical hatching glyphs"></canvas>
+<button id="go">PLAY</button>
+<script>
+// Aura · the music video. Sand that sings: glyph sand on a round vibrating plate (a Chladni plate seen from above).
+// The sand gathers on the still lines of the vibration, and on a round plate those lines are rings and spokes, so the
+// sand draws a mandala. Behind the plate: the lovespark.love glyph field (vertical hatching strokes, value noise stretched
+// into strands, a 4x4 Bayer threshold; from Joona-t.github.io assets/glyph-field.js, basalt ink).
+// Every frame is a pure function of the bar position (no state, no Math.random): ?bar=N holds a frame, PLAY runs on the
+// master's clock, window.viz.shot(bar) feeds tools/viz/render_viz.mjs.
+//   chords   each chord (2 bars) sets the spokes; the section sets the rings; the sand slides to the new figure
+//   lift     the borrowed E major (bars 9-10 of every 16) adds a ring and warms the sand from pale steel to gold
+//   bell     every bell note rings a circle out from the centre (bloom, breakdown, and an octave up in drop II)
+//   kick     the sand jumps on every kick; the field behind brightens and drifts faster with the music's energy
+//   silence  the half bar before the drop: the sand lies flat and nothing moves; at the drop it leaps into the
+//            biggest figure of the piece
+//   audio    the master's spectrum (tools/viz/analyze.py) lights the sand by radius, bass at the centre, treble at the rim
+const BPM = 128, BARS = 152, TAIL = 1.5;
+const QS = new URLSearchParams(location.search), VER = QS.get('v') === 'b' ? 'b' : 'a';   // ?v=b: version B's master
+const OFF = 0;                                                        // the r7 masters start on bar 1 (lag vs premaster 0.0 ms at 62 s, -0.4 ms at 200 s); kept for any master that does not
+const BG = '#16191d', PLATE = '#1c2026', FIELD_INK = '#e6d6ad';
+const COOL = [207, 216, 224], WARM = [233, 201, 160];                 // the sand: pale steel, gold at the lift
+const CX = 960, CY = 540, PR = 440, SR = 396;                         // plate rim radius; the sand's home radius
+const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+
+const TAU = Math.PI * 2, fr = (v) => v - Math.floor(v);
+const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
+const ease = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
+const lerp = (a, z, t) => a + (z - a) * t;
+const within = (b, a, z) => b >= a && b < z;
+function hash(a, b = 0, c = 0) { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+// ---------- the song, as data (patterns/12-aura.strudel.js, bars counted from 0) ----------
+// [start, end, name, cutoff lo, cutoff hi] from arrange(): the pluck's filter sweep, section by section
+const SECTIONS = [[0, 16, 'air', 300, 700], [16, 32, 'bloom', 700, 1400], [32, 48, 'pulse', 1400, 1900], [48, 64, 'groove', 1900, 2400],
+  [64, 80, 'full', 2400, 3000], [80, 96, 'breakdown', 2600, 800], [96, 104, 'build', 900, 4200], [104, 120, 'drop', 3200, 3800],
+  [120, 136, 'drop2', 3800, 4400], [136, 152, 'outro', 2400, 300]];
+const SPOKES = [4, 6, 5, 3, 4, 6, 5, 7];        // one per chord: Em9 · Cmaj9 · Gmaj9 · D/F# | E add9 · Cmaj9 · Am9 · Bsus4->B7
+const TUNE = [[0,0,71],[0,3,78],[0,6,76],[1,0,74],[1,6,76],[1,7,78],[2,0,79],[2,3,76],[2,6,74],[3,0,76],[4,0,74],[4,3,71],[4,6,74],
+  [5,0,78],[5,4,79],[5,6,78],[6,0,76],[6,3,74],[6,6,69],[7,0,66],[8,0,80],[8,3,78],[8,6,76],[9,0,83],[9,4,80],[10,0,79],[10,3,76],
+  [10,6,71],[11,0,74],[11,4,76],[12,0,72],[12,3,76],[12,6,81],[13,0,79],[13,4,76],[13,6,71],[14,0,69],[14,3,71],[14,6,76],[15,0,75],[15,4,78]];  // [bar in 16, 8th step, midi]
+const SILENT = [103.5, 104];                    // build's mask "<1!7 [1 0]>": the last half bar before the drop
+const sec = (b) => SECTIONS.find(([a, z]) => b >= a && b < z) || SECTIONS[SECTIONS.length - 1];
+function light(b) { const [a, z, , lo, hi] = sec(b); return clamp(Math.log(lerp(lo, hi, clamp((b - a) / (z - a))) / 300) / Math.log(4400 / 300)); }
+// rings by section; the build climbs a ring per bar; the outro gives them back
+function rings(b) { const n = sec(b)[2];
+  if (n === 'build') return 2 + Math.min(5, Math.floor(b - 96));
+  if (n === 'outro') return Math.max(1, 5 - Math.floor((b - 136) / 3.2));
+  return { air: 1, bloom: 2, pulse: 2, groove: 3, full: 4, breakdown: 3, drop: 5, drop2: 6 }[n]; }
+// how much sand is on the plate (0..1): a dusting in the air, all of it from the pulse on, gone by the end
+function amount(b) { if (b < 16) return .3 + .35 * ease(b / 16); if (b < 32) return .65 + .35 * ease((b - 16) / 16);
+  if (b >= 136) return 1 - ease((b - 138) / 13); return 1; }
+const kickOn = (b) => within(b, 32, 80) || within(b, 104, 136) ? 1 : within(b, 136, 144) ? .5 : 0;   // r7 outro: kick and sub in bars 137-144, then nothing below
+const silent = (b) => within(b, SILENT[0], SILENT[1]);
+// the lift: warmth 1 on the borrowed E major (chord 4 of 8), easing back to steel by the turn home
+function warmth(b) { const c = fr(b / 16) * 8; return c < 4 ? 0 : c < 6 ? ease((c - 4) * 3) : 1 - ease((c - 6) / 2) * .85; }
+function song(b) {
+  const beat = fr(b * 4), ci = Math.floor(b / 2) % 8;
+  const s = { b, ci, L: light(b), kick: silent(b) ? 0 : kickOn(b) * Math.exp(-beat * 6), warm: warmth(b), amt: amount(b),
+    roll: within(b, 96, 103.5) ? ease((b - 96) / 7.5) : 0, drop: b >= 104 && b < 106 ? Math.exp(-(b - 104) * 2.2) : 0, notes: [] };
+  // bell notes ringing now, [age in bars, midi, gain]: bloom, breakdown, drop II (an octave up)
+  const loop = Math.floor(b / 16) * 16;
+  for (const base of [loop - 16, loop]) for (const [br, st, m] of TUNE) { const t0 = base + br + st / 8, age = b - t0;
+    if (age < 0 || age >= 2) continue;
+    const g = within(t0, 16, 32) ? 1 : within(t0, 80, 96) ? .9 : within(t0, 120, 136) ? .75 : 0;
+    if (g) s.notes.push([age, within(t0, 120, 136) ? m + 12 : m, g]); }
+  return s;
+}
+// the figure: rings x spokes, plus a finer second mode that grows with the energy (full, drops)
+function mode(b) { const ci = Math.floor(b / 2) % 8, n = rings(b) + (ci >= 4 && ci <= 5 ? 1 : 0);
+  const n2 = sec(b)[2], c2 = { full: .15, build: .15, drop: .3, drop2: .35 }[n2] || 0;
+  return { n, m: SPOKES[ci], c2 }; }
+function fig(md, r, a) { return Math.cos(md.n * Math.PI * r) * Math.cos(md.m * a) + md.c2 * Math.cos((md.n + 2) * Math.PI * r) * Math.cos(2 * md.m * a); }
+
+// the most any grain can move from its home (px), one function for the frame and the check
+function jump(b) { const s = song(b), t = fr(b / 2) * 2;
+  return 7 * s.kick + 5 * s.roll * (1 + Math.sin(b * TAU * 8) * .5) + 9 * (1 - ease(t / .6)) * (b >= 16 ? 1 : .4) + 16 * s.drop; }
+
+// ---------- the master's spectrum: 32 bands, 30 frames a second ----------
+let SPEC = null, CUM = null;
+function spectrum(b) { const out = new Float32Array(32); if (!SPEC) return out;
+  const f = clamp((b * 240 / BPM + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f), t = f - i;
+  for (let k = 0; k < 32; k++) out[k] = Math.pow(lerp(SPEC.d[i * 32 + k], SPEC.d[(i + 1) * 32 + k], t) / 255, 1.6);
+  return out; }
+function energy(i) { let e = 0; for (let k = 0; k < 32; k++) e += SPEC.d[i * 32 + k]; return e / (32 * 255); }
+// the field's clock: it drifts faster when the music is loud, and stops in the silence (precomputed, so still pure)
+function fieldTime(b) { const sx = b * 240 / BPM; if (!CUM) return sx * .5;
+  const f = clamp((sx + OFF) * SPEC.fps, 0, SPEC.frames - 1.001), i = Math.floor(f); return lerp(CUM[i], CUM[i + 1], f - i); }
+
+// ---------- the field (lovespark.love, basalt): vertical hatching, strands of ink ----------
+const HRAMP = [' ', '╷', '┆', '╎', '¦', '│', '┃', '║'], BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const FW = 9, FH = 15, FC = Math.ceil(1920 / FW), FR = Math.ceil(1080 / FH);
+function vhash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = vhash(xi, yi), b = vhash(xi + 1, yi), c = vhash(xi, yi + 1), d = vhash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+function field(x, y, t) { return .65 * vnoise(x * .11 + t * .06, y * .022 - t * .09) + .35 * vnoise(x * .31 - t * .04, y * .07 + t * .05); }
+const smooth = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
+const fatlas = document.createElement('canvas'); fatlas.width = FW * HRAMP.length; fatlas.height = FH;
+{ const a = fatlas.getContext('2d'); a.font = '13px ui-monospace, "SF Mono", Menlo, monospace'; a.textAlign = 'center'; a.textBaseline = 'middle'; a.fillStyle = FIELD_INK;
+  for (let i = 1; i < HRAMP.length; i++) { a.globalAlpha = .55 + .45 * i / (HRAMP.length - 1); a.fillText(HRAMP[i], i * FW + FW / 2, FH / 2); } }
+const FMASK = new Float32Array(FC * FR);        // the field thins out around the plate, as it does behind the site's text
+for (let r = 0; r < FR; r++) for (let c = 0; c < FC; c++) { const d = Math.hypot(c * FW + FW / 2 - CX, r * FH + FH / 2 - CY); FMASK[r * FC + c] = d < PR + 14 ? 0 : .3 + .7 * smooth(PR + 14, PR + 260, d); }
+
+// ---------- the sand: glyphs from fine grain to heaped, code glyphs where it is thickest ----------
+const SRAMP = ['.', '·:', ':;', "-'", '=+', '*+', '#x', '%&', '0{}', '1<>/@'];
+const GW = 6, GH = 9, SGL = []; SRAMP.forEach((set) => [...set].forEach((ch) => SGL.push(ch)));
+const SSTART = []; { let n = 0; SRAMP.forEach((set) => { SSTART.push(n); n += set.length; }); }
+const satlas = document.createElement('canvas'); satlas.width = SGL.length * 10; satlas.height = 12; const sa = satlas.getContext('2d');
+let satlasKey = '';
+function sandAtlas(rgb) { const key = rgb.join(); if (key === satlasKey) return; satlasKey = key;
+  sa.clearRect(0, 0, satlas.width, 12); sa.font = '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace'; sa.textBaseline = 'middle'; sa.textAlign = 'center';
+  sa.fillStyle = `rgb(${rgb.join(',')})`; SGL.forEach((ch, i) => sa.fillText(ch, i * 10 + 5, 6)); }
+const GRAINS = []; for (let y = CY - SR; y <= CY + SR; y += GH) for (let x = CX - SR; x <= CX + SR; x += GW) {
+  const dx = x - CX, dy = y - CY, r = Math.hypot(dx, dy) / SR; if (r <= 1) GRAINS.push([x, y, r, Math.atan2(dy, dx), GRAINS.length]); }
+
+// how far the cells pull apart (0 = whole figure, 1 = about 20 px gaps, more at the drop)
+function breakAmt(b, s, tm) { const n = sec(b)[2];
+  let v = .55 * s.kick + .9 * (1 - tm) * (b >= 2 ? 1 : 0) + 2.2 * s.drop + .9 * s.roll;
+  if (n === 'air' || n === 'bloom') v += .25 + .2 * Math.sin(b * Math.PI / 2);               // no drums yet: the cells breathe
+  if (n === 'breakdown') v += .55 + .35 * Math.sin(b * Math.PI / 4);                        // the cells float apart while the bell has the room
+  if (n === 'outro') v += 1.6 * ease((b - 138) / 12);                                        // they drift away as the sand thins
+  return v; }
+function frame(b) {
+  const s = song(b), spec = spectrum(b), still = silent(b);
+  const fade = 1 - ease((b - 151) / 1.5);                             // the last bar and the tail fade to the plate alone
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, 1920, 1080);
+  // the field
+  const ft = fieldTime(b), fa = (.13 + .1 * s.kick + .12 * s.drop + .05 * s.roll) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fade;
+  for (let r = 0; r < FR; r++) for (let c = 0; c < FC; c++) { const mk = FMASK[r * FC + c]; if (!mk) continue;
+    let v = field(c, r, ft) * mk; v = v * 1.45 - .02 + (BAYER[(r & 3) * 4 + (c & 3)] / 16 - .5) * .22;
+    const g = Math.max(0, Math.min(7, Math.floor(v * 8))); if (!g) continue;
+    cx.globalAlpha = fa; cx.drawImage(fatlas, g * FW, 0, FW, FH, c * FW, r * FH, FW, FH); }
+  // the plate
+  cx.globalAlpha = 1; cx.fillStyle = PLATE; cx.beginPath(); cx.arc(CX, CY, PR, 0, TAU); cx.fill();
+  const rgb = COOL.map((v, i) => Math.round(lerp(v, WARM[i], s.warm))); sandAtlas(rgb);
+  cx.strokeStyle = `rgb(${rgb.join(',')})`; cx.lineWidth = 1.5; cx.globalAlpha = (.22 + .25 * s.kick + .4 * s.drop) * (.4 + .6 * fade);
+  cx.beginPath(); cx.arc(CX, CY, PR, 0, TAU); cx.stroke();
+  // the sand: slides from the last chord's figure to this one over the first 0.6 bar of each chord
+  const c0 = Math.floor(b / 2) * 2, fromFlat = silent(c0 - .01), tm = b < 2 ? ease(b / 1.5) : ease((b - c0) / (fromFlat ? .25 : .6));
+  const mdA = mode(Math.max(0, c0 - .01)), mdB = mode(b), rot = b * .018, flat = still ? 1 : 0;
+  const t = b * 240 / BPM; let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;    // seconds; the music's energy now
+  const twist = (.35 + .6 * E) * Math.sin(b * Math.PI / 4) * (flat ? 0 : 1);                  // rings turn against each other: spokes curl into spirals
+  const brk = flat ? 0 : breakAmt(b, s, tm), flowA = flat ? 0 : 2 + 7 * E, shim = flat ? 0 : 1.6;
+  let maxR = 0;
+  const sharp = 1.6 + 2.6 * s.L, j = jump(b), beat16 = Math.floor(b * 16), ja = (b - c0) < .6 && b >= 2 ? 1 - tm : 0;
+  const L = fade * (b < 1 ? ease(b) : 1);
+  for (const [x, y, r, a, id] of GRAINS) {
+    const h0 = hash(id, 7); if (h0 > s.amt) continue;
+    const aT = a + rot - twist * (r - .5);
+    const kFlat = .16 + .06 * hash(id, 11), loose = hash(id, 12) < .14 ? .11 + .07 * hash(id, 13) : 0;   // the even layer of the silence; loose grains everywhere
+    let k;
+    if (flat) k = kFlat;
+    else { const kB = 1 - Math.min(1, Math.abs(fig(mdB, r, aT)) * sharp);
+      const kA = fromFlat ? kFlat : 1 - Math.min(1, Math.abs(b < 2 ? 1 : fig(mdA, r, aT)) * sharp);
+      k = lerp(kA, kB * kB * (1 - r * .2), tm); k = Math.max(k, loose); }
+    for (const [age, m, g] of s.notes) { const rr = age / 1.6, w = .035 + .02 * (m % 3); const d = Math.abs(r - rr); if (d < w) k = Math.max(k, (1 - d / w) * (1 - age / 2) * .8 * g); }
+    if (k < .1) continue;
+    const band = Math.min(31, r * 30 | 0); k *= .62 + .55 * spec[band];
+    const lv = Math.min(SRAMP.length - 1, Math.pow(clamp(k), .8) * SRAMP.length | 0), set = SRAMP[lv];
+    const gi = SSTART[lv] + (hash(id, flat ? 0 : beat16 >> (kickOn(b) ? 0 : 2)) * set.length | 0);
+    let px = x + (hash(id, 31) - .5) * 4, py = y + (hash(id, 32) - .5) * 4;   // a fixed jitter: grains, not a grid
+    if (!flat && j > 0) { const ang = hash(id, 21) * TAU, mag = j * (.35 + .65 * hash(id, 22)) * (s.drop > .05 ? 1 : 1 - .4 * ja);
+      px += Math.cos(ang) * mag + (ja > 0 ? Math.cos(a) * 7 * ja * (hash(id, 23) - .5) : 0); py += Math.sin(ang) * mag; }
+    if (!flat) {
+      // cells: the figure's own lattice (ring bands x spoke halves) breaks into pieces that pull apart and re-form
+      const n = mdB.n, m2 = mdB.m * 2, ib = Math.min(n - 1, Math.floor(r * n)), is = Math.floor(fr((a + rot) / TAU + 1) * m2), ch = hash(ib, is, 77);
+      const ca = (is + .5) / m2 * TAU - rot, cr = (ib + .5) / n, out = brk * 22 * (.45 + ch) * (.35 + cr);
+      px += Math.cos(ca) * out - Math.sin(ca) * out * .35 * (ch - .5) + brk * 5 * (hash(id, 24) - .5);
+      py += Math.sin(ca) * out + Math.cos(ca) * out * .35 * (ch - .5) + brk * 5 * (hash(id, 25) - .5);
+      // the sand always flows a little, and every grain trembles on its own small orbit
+      px += Math.sin(y * .013 + t * .9 + Math.sin(x * .009 - t * .5)) * flowA; py += Math.cos(x * .012 - t * .8 + Math.cos(y * .01 + t * .4)) * flowA;
+      const ph = t * (2.5 + 2 * hash(id, 41)) + hash(id, 42) * TAU; px += Math.cos(ph) * shim; py += Math.sin(ph) * shim;
+      if (hash(id, beat16, 5) > .985) k = Math.min(1, k + .35);                                  // a glint here and there on the 16ths
+    }
+    { const lim = PR - 9 - 3 * hash(id, 51), dx = px - CX, dy = py - CY, rr = Math.hypot(dx, dy);       // sand that reaches the rim piles up against it
+      if (rr > lim) { px = CX + dx / rr * lim; py = CY + dy / rr * lim; } }
+    { const rr = Math.hypot(px - CX, py - CY); if (rr > maxR) maxR = rr; }
+    cx.globalAlpha = clamp(.3 + .7 * k) * L; cx.drawImage(satlas, gi * 10, 0, 10, 12, px - 5, py - 6, 10, 12);
+  }
+  window.viz.maxR = maxR;
+  // the title, the first eight bars, bottom left, well clear of the plate
+  const ta = ease(b / 1.5) * (1 - ease((b - 6) / 2));
+  if (ta > 0) { cx.globalAlpha = ta * .9; cx.fillStyle = FIELD_INK; cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';
+    cx.font = '700 56px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('A U R A', TITLE.x, TITLE.y);
+    cx.globalAlpha = ta * .6; cx.font = '400 22px ui-monospace, "SF Mono", Menlo, monospace'; cx.fillText('Bvby Ash', TITLE.x + 4, TITLE.y + 40); }
+  cx.globalAlpha = 1;
+}
+const TITLE = { x: 96, y: 930, w: 260, h: 100 };                     // box: x..x+w, y-56..y+44
+
+// ---------- layout check: run viz.check() in the console, or tools/viz/check_layout.mjs aura ----------
+// Every 8th of a bar the page draws the frame and measures where every grain actually landed: none may cross the rim,
+// the plate and the title stay in the frame, and the title stays clear of the plate and of the hatching's quiet ring.
+function check(step = 1 / 8) { const bad = [], say = (b, m) => { if (bad.length < 40) bad.push(`bar ${(b + 1).toFixed(3)}: ${m}`); };
+  if (CY - PR < 8 || CY + PR > 1072 || CX - PR < 8 || CX + PR > 1912) say(0, 'the plate leaves the frame');
+  const tx0 = TITLE.x, tx1 = TITLE.x + TITLE.w, ty0 = TITLE.y - 56, ty1 = TITLE.y + 44;
+  if (tx0 < 8 || ty1 > 1072) say(0, 'the title leaves the frame');
+  const nx = clamp(CX, tx0, tx1), ny = clamp(CY, ty0, ty1); if (Math.hypot(nx - CX, ny - CY) < PR + 40) say(0, `the title touches the plate (gap ${(Math.hypot(nx - CX, ny - CY) - PR).toFixed(0)} px)`);
+  for (let b = 0; b < BARS + TAIL; b += step) { frame(b); const m = window.viz.maxR + 5; if (m > PR - 3) say(b, `sand leaves the plate: a grain at ${m.toFixed(0)} px > rim ${PR - 3}`); }
+  return bad; }
+
+// ---------- clocks: ?bar=N holds one frame; otherwise the master plays and the picture follows its time ----------
+const go = document.getElementById('go');
+window.viz = { BPM, BARS, TAIL, frame, song, mode, jump, check, shot: (bar, q = .93) => { frame(bar); return cv.toDataURL('image/jpeg', q); }, ready: false };
+fetch(VER === 'b' ? 'aura-b-spectrum.json' : 'aura-spectrum.json').then((r) => r.json()).then((j) => {
+    SPEC = { fps: j.fps, frames: j.frames, d: Uint8Array.from(atob(j.data), (ch) => ch.charCodeAt(0)) };
+    CUM = new Float32Array(SPEC.frames); for (let i = 1; i < SPEC.frames; i++) { const b = (i / SPEC.fps - OFF) * BPM / 240;
+      CUM[i] = CUM[i - 1] + (silent(b) ? 0 : (.5 + 2.6 * energy(i)) / SPEC.fps); } })
+  .catch((e) => console.error('no spectrum file: the sand will not follow the music', e))
+  .finally(() => {
+    window.viz.ready = true;
+    if (QS.has('bar')) { go.remove(); frame(+QS.get('bar')); return; }
+    frame(3);
+    go.onclick = () => {
+      go.remove();
+      const audio = new Audio(QS.get('audio') || (VER === 'b' ? '/renders/aura-b-r7-master.mp3' : '/renders/aura-r7-master.mp3')); window.viz.audio = audio;
+      const from = +QS.get('from') || 0; let t0 = null;
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = from * 240 / BPM + OFF; audio.play(); });
+      audio.addEventListener('error', () => { t0 = performance.now() - from * 240 / BPM * 1000; });
+      const loop = (t) => { const sx = t0 === null ? audio.currentTime - OFF : (t - t0) / 1000; frame(Math.min(sx * BPM / 240, BARS + TAIL)); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    };
+  });
+</script>
+</body>
+</html>
