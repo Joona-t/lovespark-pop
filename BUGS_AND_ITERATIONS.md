@@ -489,3 +489,10 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Results:** A -9.4 LUFS, LRA 5.1, -1.3 dBTP, slope -0.733; B -9.4 LUFS, LRA 5.1, -1.3 dBTP, slope -0.756; drop air minus presence +2.3 -> +0.1 dB (A), +2.5 -> +0.4 dB (B); crest 12.4 -> 8.8 dB. Null -34.8/-34.9 dB, kicks four per bar where arranged. Masters replaced in `Bvby Ash project/Aura`; MP3s sent. Raw stems kept: `renders/aura-r3.f32`, `aura-b-r3.f32`.
 - **Limits:** numbers, not ears; Strudel has no per-bus EQ; the final mix belongs in Ableton with Joona.
 - RSI: 2 captures in parallel (306 s) + 4 master runs -> 1 test run lost to the disabled EQ -> asked-vs-applied EQ check now part of any chain change.
+
+## ITER-051 (2026-11-21): Aura hats on the kick only
+- **Asked:** "Instead of having the hi-hat hit constantly, which sounds super odd, just have it hit with the kick."
+- **Done (A, B, live):** closed hat = 4 per bar on the kick (`hh*4`, gain .16, 8 kHz high-pass, short decay); the 808 shaker (a second hat on every 16th) removed. The open hat stays on the off-beat in full and the drops.
+- **Verified:** no eval error; 320 closed hats across 152 bars, 0 not on a kick (pulse has kicks but no hats: 384 kicks); 0 shaker hits; 192 open hats.
+- **Not done:** the masters in `Bvby Ash project/Aura` (ITER-050) still have the 8-per-bar hats; a new capture and master is needed for them.
+- RSI: 1 edit across 3 files, 1 check -> nothing lost -> none needed.

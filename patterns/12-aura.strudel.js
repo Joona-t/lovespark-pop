@@ -102,16 +102,15 @@ const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
 
 // ---- drums, layer 2: Summit's groove. Clap on 2 and 4, shuffled 16th hats, open hat on every off-beat ----
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
-// thinned (Joona: "that tick tick tick tick sound is overwhelming"): 8 per bar instead of 16, the off-beat leads, quieter
-const hats = s("hh*8").bank("RolandTR909").swingBy(1/7, 4)
-  .gain("[.08 .2]*4").hpf(8000).decay(.05).pan(sine.range(.42, .58).fast(2)).orbit(1)
+// on the kick only (Joona: "instead of having the hi-hat hit constantly, which sounds super odd, just have it hit with the kick")
+const hats = s("hh*4").bank("RolandTR909").gain(.16).hpf(8000).decay(.05).orbit(1)
 const open = s("[~ oh]*4").bank("RolandTR909").decay(.2).gain(.3).hpf(5000).orbit(1)
 
 // ---- drums, layer 3: percussion that never repeats inside 4 bars, and a crash at the top of each 16 ----
 const rim = s(`<[~ ~ rim ~ ~ rim ~ ~ ~ ~ rim ~ ~ ~ ~ rim] [~ ~ rim ~ ~ ~ ~ rim ~ ~ rim ~ ~ rim ~ ~]
               [~ ~ rim ~ ~ rim ~ ~ ~ rim ~ ~ ~ ~ rim ~] [~ ~ rim ~ rim ~ ~ rim ~ ~ rim ~ rim ~ rim rim]>`)
   .bank("RolandTR909").gain(.22).pan(.62).delay(.2).delaytime(3/16).delayfeedback(.25).orbit(1)
-const shaker = s("~ hh ~ hh").fast(4).bank("RolandTR808").gain("[.04 .07]*8").hpf(9000).pan(.36).orbit(1)   // half as loud
+const shaker = silence   // removed with the constant hats: it was a second hi-hat ticking on every 16th
 const tom = s("<~ ~ ~ [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ lt ~ mt ~ ht ht]>").bank("RolandTR909").gain(.3).room(.3).orbit(1)
 const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.26).room(.4).orbit(1)
 
