@@ -106,7 +106,7 @@ const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
 const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
 // on the kick only (Joona: "instead of having the hi-hat hit constantly, which sounds super odd, just have it hit with the kick")
 const hats = s("hh*4").bank("RolandTR909").gain(.16).hpf(8000).decay(.05).orbit(1)
-const open = s("[~ oh]*4").bank("RolandTR909").decay(.2).gain(.3).hpf(5000).orbit(1)
+const open = s("[~ oh]*4").bank("RolandTR909").decay(.2).gain(.3).hpf(5000).orbit(1)   // not used: removed from every section (Joona, after previews 7a/7b: "7b, no open hat")
 
 // ---- drums, layer 3: percussion that never repeats inside 4 bars, and a crash at the top of each 16 ----
 const rim = silence   // removed (Joona, after previews: "1 is the best, the rim is out of place")
@@ -131,11 +131,11 @@ arrange(
   [16, stack(drone, bell, pad, glass, pluck(700, 1400))],   // bloom: the melody arrives as a far bell, still no drums
   [16, stack(kick.gain(.42), shaker, bass(260, .18), bellLow, pad, glass, pluck(1400, 1900))],   // pulse: soft kick, shaker, quiet bass; the bell an octave down
   [16, stack(kick.gain(.54), clap, hats, rim, tom, bass(), soft, bell, pad, glass, pluck(1900, 2400))],   // groove: the soft synth joins the bell
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(520, .42), all3, pad, glass, pluck(2400, 3000))],   // full: all three voices together
+  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(520, .42), all3, pad, glass, pluck(2400, 3000))],   // full: all three voices together
   [16, stack(drone, soft, bellLow, pad.gain(.2), glass, pluck(2600, 800))],   // breakdown: drums out; soft synth and the low bell, close and intimate
   [8, stack(roll, riser, pad, glass, soft, pluck(900, 4200)).mask("<1!7 [1 0]>")],   // build: the soft synth alone over the roll, then half a bar of silence
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
-  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
+  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
+  [16, stack(kick, clap, hats, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
   [16, stack(kick.gain(.4).duckdepth(.25).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo,
              soft.velocity(saw.range(1, .3).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above; the soft synth alone carries the melody (Joona: "the ending should be the soft synth not the bell")
 )
