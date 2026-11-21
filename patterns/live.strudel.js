@@ -1,4 +1,4 @@
-// 12 "Aura" · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
+// 12 "Aura" (version B: deeper, resonant, echoey arp) · Bvby Ash · deadmau5 x John Summit, 128 BPM, E minor, 152 bars (~4:45)
 // The name is Joona's word for the opening: "this aura of airy emotional resonance".
 // Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
 // Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
@@ -24,19 +24,21 @@ const arpShape = `<
   [0 1 2 3 4 3 2 1 0 1 2 3 4 3 2 1]
   [0 2 4 2 1 3 4 3 0 2 4 3 1 2 4 2]>`
 // lo..hi: the cutoff at the start and end of a 16-bar section
-const pluck = (lo, hi) => chords.arp(arpShape)
-  .s("sawtooth").unison(2).detune(.12)
-  .lpf(saw.range(lo, hi).slow(16)).lpq(8).ftype("ladder")
-  .lpattack(.001).lpenv(4).lpdecay(.12).lpsustain(0)
-  .attack(.001).decay(.22).sustain(0).release(.05)
-  .gain("[.75 .42 .58 .42]*4")
-  .delay(.35).delaytime(3/16).delayfeedback(.45)
-  .pan("[.32 .68]*8").room(.3).size(.6).orbit(2)
+// Version B (Joona: "more synth like and echoey and resonant ... too high pitched"): an octave lower, three wider saws,
+// resonance near whistling, the filter capped at 60% of version A, longer notes, a long wet ping-pong echo
+const pluck = (lo, hi) => chords.arp(arpShape).add(note(-12))
+  .s("sawtooth").unison(3).detune(.22)
+  .lpf(saw.range(lo * .6, hi * .6).slow(16)).lpq(14).ftype("ladder")
+  .lpattack(.002).lpenv(3).lpdecay(.18).lpsustain(.15)
+  .attack(.002).decay(.32).sustain(.08).release(.12)
+  .gain("[.8 .48 .62 .48]*4")
+  .delay(.55).delaytime(3/16).delayfeedback(.62)
+  .pan("[.2 .8]*8").room(.45).size(.8).orbit(2)
 
 // a glassy square an octave up, only on the downbeats of each 4: the sparkle on top of the pluck
-const glass = chords.arp(arpShape).add(note(12)).struct("[x ~ ~ ~]*4")
+const glass = chords.arp(arpShape).struct("[x ~ ~ ~]*4")    // B: at the chord register, not an octave up
   .s("square").lpf(3200).attack(.001).decay(.09).sustain(0).release(.04)
-  .gain(.11).delay(.4).delaytime(3/8).delayfeedback(.35).room(.4).orbit(2)
+  .gain(.09).delay(.4).delaytime(3/8).delayfeedback(.35).room(.4).orbit(2)
 
 // ---- 2. the pad: five detuned saws, slow swell, filter rising across the 16 bars, big room ----
 const pad = chords.s("sawtooth").unison(5).detune(.28)

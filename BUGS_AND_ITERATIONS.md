@@ -444,3 +444,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Check mistake:** the first cutoff reading said 180 Hz at bar 136 because `queryArc` returns events in stack order, not time order; sorted by start time, the readings above are correct.
 - **Not verified:** how it sounds; his listen. A low resonant arp sits closer to the bass's driven saw (octave 2), which may need a mix change after he hears it.
 - RSI: 1 file, 2 checks -> 1 check lost to unsorted events -> sort by time before reading values at a bar.
+
+## ITER-046 (2026-11-21): "Aura" version A mastered; version B on the live page
+- **Capture:** headless Chrome (`/?stems=aura&bars=152&auto=1&warm=` with every 909 voice used plus the 808 hat), 288.39 s, 12 channels: the first capture with the `other` stem (BUG-015).
+- **Mix report (`tools/mix_live.py ... --first-kick-bar 33`):** null test -34.6 dB (gate -20); stem peaks: kick -3.0, drums -3.3, music -11.3, bass -5.1, bell -12.8, other (the pad) -10.4 dBFS; four kicks in every bar of 33-80 and 105-152, none elsewhere, as arranged. The live output clipped at +2.0 dBFS as played (known, the live page has no limiter); the master is clean. master-14: -14.2 LUFS, LRA 9.7, -1.1 dBTP; loud master: -10.8 LUFS, -1.0 dBTP. Length 4:47.8.
+- **Delivered:** `renders/aura-master-14.wav` and a 320k MP3 sent to Joona. Raw stems `renders/aura.f32` kept for the Ableton move.
+- **Live page:** now plays version B (`patterns/live.strudel.js` = `12-aura-b`).
+- **Not verified:** his listen of either version.
+- RSI: capture 290 s real time, mix about 1 min -> nothing lost -> none needed.
