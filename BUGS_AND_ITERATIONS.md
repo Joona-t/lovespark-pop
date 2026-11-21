@@ -436,3 +436,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Root cause:** `STEMS` in `tools/live/index.html` listed fixed orbits, and the mixer printed the null test without acting on it, so a missing bus could pass silently.
 - **Fix:** a seventh stem, `other`, sums orbits 5-8 (12 channels now); the mixer reads it (high-pass 120 Hz, into the mix bus) and now stops with "the stems do not add up to the mix" when the null test is worse than -20 dB. Channel count is derived from the layout.
 - **Proof the check works:** a synthetic capture with the pad in the master but not in the stems stops at null -3.0 dB, "nothing mixed"; the complete one passes the gate (null -148.9 dB). Slow Light's real captures nulled at -33 to -35 dB, well inside the gate.
+
+## ITER-045 (2026-11-21): "Aura" version B, a deeper, resonant, echoey arp
+- **Asked:** "i want the arp to also be more synth like and echoey and resonant i feel like its too high pitched right now? keep this version but i would like to hear another."
+- **Done:** version A untouched (`patterns/12-aura.strudel.js`, its stems capturing as this was written). Version B in `patterns/12-aura-b.strudel.js`: the arp an octave lower, three saws with wider detune, ladder resonance 14 (A: 8), the cutoff capped at 60% of A's, a softer filter envelope with a little sustain, longer notes, ping-pong delay feedback .62 (A: .45) and wetter, wider pan; the glass layer moved from an octave up to the chord register and turned down a little. The live file stays on A until A's capture ends, because the headless capture reads the live file as it records.
+- **Verified:** no eval error; 0 notes outside their chord across 152 bars; arp range C2 to B3 (MIDI 36-59); pluck cutoff at section starts 180, 840, 1440, 1560, 1920, 2280 Hz, peak 2639 Hz at the end of drop II (A: 4400).
+- **Check mistake:** the first cutoff reading said 180 Hz at bar 136 because `queryArc` returns events in stack order, not time order; sorted by start time, the readings above are correct.
+- **Not verified:** how it sounds; his listen. A low resonant arp sits closer to the bass's driven saw (octave 2), which may need a mix change after he hears it.
+- RSI: 1 file, 2 checks -> 1 check lost to unsorted events -> sort by time before reading values at a bar.
