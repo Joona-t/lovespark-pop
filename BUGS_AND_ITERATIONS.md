@@ -363,3 +363,11 @@ Joona, after listening on headphones and against other house tracks: "kick in th
 - The live sum still peaks over full scale (+1.7 dBFS); only the master is clean.
 
 RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the first note was withdrawn (~2 min) -> none: his ears decide, cheap to redo.
+
+## ITER-037 (2026-11-21): track 12 stage 1, kick + bass
+- **Asked:** a John Summit-style tech / bass house track.
+- **Done:** `patterns/live.strudel.js` on branch `track-12-tech-house` (cut from `track-11-night-shift`, which holds the stem and video tools and is not in `main` yet). 127 BPM, G minor. Only two parts: a 909 kick and a 2-bar 16th-note bassline that never lands on the kick (sine sub + driven saw an octave up, ducked by the kick through `duckorbit`).
+- **Why this order:** the Slow Light lesson (ITER-029): start from the part that carries the style, alone, and wait for Joona's ears. In tech house that part is the bass, not chords.
+- **Verified:** live page playing, no eval error, cps 0.529 (127 BPM); per 2 bars: 8 kicks (orbit 9), 14 sub + 14 saw notes (orbit 3), first notes G1 on 16ths 1, 3, 6, 9.
+- **Not verified:** how it sounds. No audio measurement at this stage; that is his call.
+- RSI: 1 save, 1 check -> nothing lost -> none needed.
