@@ -7,7 +7,7 @@ Input: raw 32-bit float, 12 channels at the page's sample rate: master 2, kick 1
 Same method as tools/mix.py (the club set): null test, bar 1 from the first kick, the balance as played with corrective
 processing only, masters to a loudness target, every number printed and saved to <out-prefix>-mix-report.json.
 """
-import argparse, json, re, subprocess, sys
+import argparse, json, os, re, subprocess, sys
 import numpy as np
 
 ap = argparse.ArgumentParser()
@@ -121,6 +121,15 @@ report = {"capture_seconds": round(frames / SR, 2), "null_test_dB": round(null_d
 #    c. glue compression on the whole mix, d. a gentle soft clip, e. a 4x oversampled limiter
 #    f. loudness: "master" at -9 LUFS (top-charting dance and electronic average -8.3, iZotope 2025), "master-14" for reference
 TARGET_SLOPE = -0.746
+def chain_lag(ref_path, path, at=None, secs=10.0):
+    """Seconds by which `path` lags `ref_path`, from cross-correlation of a 10 s slice in the middle."""
+    at = at if at is not None else max(0.0, dur / 2 - secs / 2)
+    def get(p):
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{at:.3f}", "-t", f"{secs:.3f}", "-i", p, "-ac", "1", "-ar", "48000", "-f", "f32le", "-"], capture_output=True).stdout
+        return np.frombuffer(r, np.float32).astype(np.float64)
+    a, b = get(ref_path), get(path); n = min(len(a), len(b)); N = 2 * n
+    c = np.fft.irfft(np.fft.rfft(b[:n], N) * np.conj(np.fft.rfft(a[:n], N)), N); l = int(np.argmax(c)); l = l if l < n else l - N
+    return l / 48000
 def spectrum(path):
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", "44100", "-f", "f32le", "-"], capture_output=True).stdout
     x = np.frombuffer(raw, np.float32).astype(np.float64); W = 4096; n = len(x) // W
@@ -152,6 +161,14 @@ for tag, target in (("master", -9.0), ("master-14", -14.0)):
         if abs(m["LUFS"] - target) <= 0.25:
             break
         gain += target - m["LUFS"]
+    # the chain delays the audio (FIR EQ 10 ms, limiter look-ahead 2 ms, crossover phase about 4 ms, BUGS ITER-058):
+    # measure the lag against the premaster by cross-correlation and trim it, so the master starts exactly on bar 1
+    lag = chain_lag(premix, out)
+    if abs(lag) > 0.0002:
+        fixed = out[:-4] + "-aligned.wav"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-af", f"atrim=start={lag:.6f},apad=whole_dur={dur:.3f}", "-c:a", "pcm_s24le", fixed], check=True)
+        os.replace(fixed, out); m = measure(out)
+    m["chain_delay_ms"] = round(lag * 1000, 2); m["lag_after_align_ms"] = round(chain_lag(premix, out) * 1000, 2)
     m["slope"] = round(spectrum(out)[2], 3)
     report[tag] = m
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-c:a", "libmp3lame", "-b:a", "320k", f"{OUT}-{tag}.mp3"], check=True)
