@@ -35,6 +35,9 @@ const QS = new URLSearchParams(location.search), OFF = 0;
 const BG = '#12142a';                                                  // deep indigo, as in Joona's reference picture of neurons
 const SW = 1920, SH = 1080, GW = 6, GH = 9, COLS = SW / GW, ROWS = SH / GH, NCELL = COLS * ROWS;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
+// ?cover: the release cover. The middle square of the frame drawn three times as sharp (3240 px, scaled to 3000 after), no title.
+const COVER = QS.has('cover'), AK = COVER ? 3 : 1, TX = COVER ? -420 * AK : 0;
+if (COVER) { cv.width = cv.height = 1080 * AK; cv.style.aspectRatio = '1 / 1'; }
 const PI = Math.PI, TAU = PI * 2, fr = (v) => v - Math.floor(v);
 const clamp = (v, a = 0, z = 1) => v < a ? a : v > z ? z : v;
 const ease = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
@@ -88,8 +91,8 @@ const HAT = GLY.length; HRAMP.forEach((ch) => GLY.push(ch));
 // the palette: cyan · steel · gold · white · pink · violet · orange (the myelin)
 const ANCH = [[112, 214, 232], [207, 216, 224], [233, 201, 160], [255, 246, 232], [255, 118, 170], [158, 136, 255], [240, 152, 70]], HSTEP = 8, NC = (ANCH.length - 1) * HSTEP + 1;
 const BRANCH_HUE = [1, .55, 5, 4.6, 1, 5, 4.2, .8];   // a dendrite's colour: steel, cyan-steel, violet, pink-violet, pink (a child keeps its parent's, mostly)
-const TW = 10, TH = 12, atlas = document.createElement('canvas'); atlas.width = GLY.length * TW; atlas.height = NC * TH;
-{ const a = atlas.getContext('2d'); a.textBaseline = 'middle'; a.textAlign = 'center';
+const TW = 10, TH = 12, atlas = document.createElement('canvas'); atlas.width = GLY.length * TW * AK; atlas.height = NC * TH * AK;
+{ const a = atlas.getContext('2d'); a.scale(AK, AK); a.textBaseline = 'middle'; a.textAlign = 'center';
   for (let row = 0; row < NC; row++) { const h = row / HSTEP, i = Math.min(ANCH.length - 2, Math.floor(h)), f = h - i;
     a.fillStyle = `rgb(${ANCH[i].map((v, q) => Math.round(lerp(v, ANCH[i + 1][q], f))).join(',')})`;
     GLY.forEach((ch, g) => { a.font = g >= HAT ? '11px ui-monospace, "SF Mono", Menlo, monospace' : '700 8px Menlo, Consolas, "DejaVu Sans Mono", monospace';
@@ -181,10 +184,10 @@ const STAMP = new Int32Array(NCELL); let stampNo = 0;
 const titleAlpha = (b) => ease(b / 1.5) * (1 - ease((b - 6) / 2));
 
 function frame(b) {
-  const s = song(b), spec = spectrum(b), still = !!silentOf(b), t = b * 240 / BPM, ta = titleAlpha(b), tfull = ease(ta * 1.7);
+  const s = song(b), spec = spectrum(b), still = !!silentOf(b), t = b * 240 / BPM, ta = COVER ? 0 : titleAlpha(b), tfull = ease(ta * 1.7);
   let E = 0; for (let q = 0; q < 32; q++) E += spec[q]; E /= 32;
   const fadeAll = (1 - .85 * ease((b - 136.6) / 1.4)) * (b < 1 ? .25 + .75 * ease(b) : 1), beat16 = Math.floor(b * 16), kAge = fr(b * 4), kOn = still ? 0 : kickOn(b);
-  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, SW, SH);
+  cx.setTransform(AK, 0, 0, AK, TX, 0); cx.globalAlpha = 1; cx.fillStyle = BG; cx.fillRect(0, 0, SW, SH);
   stampNo++; let nfig = 0, nhatch = 0, tInk = 0, total = 0;
   const shake = still ? 0 : 2.5 * s.kick + 6 * s.drop;
   for (const net of NET) { const fadeEnd = net.pb + net.prune; if (b < net.b0 || b >= fadeEnd) continue;
@@ -206,10 +209,10 @@ function frame(b) {
       if (s.stab > .2 && hash(i, beat16, 4) < .3 * s.stab) lit = Math.max(lit, .6);
       if (lit > 1) lit = 1;
       k = Math.min(1, k * (.78 + .38 * spec[BAND[i]]) + .45 * lit); if (lit > .3) hue = lerp(hue, hue > 4.5 ? 3.4 : 2.7, Math.min(1, lit * 1.1));   // lit: toward a warm white-gold
-      let al = clamp(.35 + .7 * k) * base * fadeAll * (1 - tfull * TMASK[i]); if (lit > 0) al = Math.min(1, al + .4 * lit * fadeAll * (1 - tfull * TMASK[i])); if (al < .03) continue;
+      let al = clamp(.35 + .7 * k) * base * fadeAll * (1 - tfull * TMASK[i]); if (lit > 0) al = Math.min(1, al + .4 * lit * fadeAll * (1 - tfull * TMASK[i])); if (COVER) al = Math.min(1, al * 1.45); if (al < .03) continue;
       const lv = Math.min(SRAMP.length - 1, Math.pow(k, .8) * SRAMP.length | 0), set = SRAMP[lv], g = SSTART[lv] + (hash(i, still ? 0 : beat16 >> 1) * set.length | 0);
       const row = clamp(Math.round(hue * HSTEP), 0, NC - 1), px = (i % COLS) * GW + GW / 2, py = Math.floor(i / COLS) * GH + GH / 2, dx = shake ? (hash(i, 21) - .5) * 2 * shake : 0, dy = shake ? (hash(i, 22) - .5) * 2 * shake : 0;
-      cx.globalAlpha = al; cx.drawImage(atlas, g * TW, row * TH, TW, TH, px - TW / 2 + dx, py - TH / 2 + dy, TW, TH);
+      cx.globalAlpha = al; cx.drawImage(atlas, g * TW * AK, row * TH * AK, TW * AK, TH * AK, px - TW / 2 + dx, py - TH / 2 + dy, TW, TH);
       if (STAMP[i] !== stampNo) { STAMP[i] = stampNo; nfig++; } total++; if (INTITLE[i] && al > tInk) tInk = al; } }
   // the hatching underneath, wherever no neuron sits: it drifts and sways with the music's energy (no rings of light)
   const ft = fieldTime(b), fa = (.27 + .1 * s.kick + .12 * s.drop + .06 * s.chop + .07 * s.stab) * (b < 4 ? .4 + .6 * ease(b / 4) : 1) * fadeAll * (still ? .7 : 1), sway = still ? 0 : 1.5 + 5 * E;
@@ -217,7 +220,7 @@ function frame(b) {
     let v = hatchField(XC[i] + Math.sin(YR[i] * .09 + ft * 1.7) * sway, YR[i], ft); v = v * 1.35 - .05 + BAY[i];
     const g = v >= 1 ? 6 : Math.floor(v * 8) - 1; if (g < 0) continue;
     const al = fa * (1 - tfull * TMASK[i]); cx.globalAlpha = al;
-    cx.drawImage(atlas, (HAT + g) * TW, 2 * HSTEP * TH, TW, TH, (i % COLS) * GW + GW / 2 - TW / 2, Math.floor(i / COLS) * GH + GH / 2 - TH / 2, TW, TH);
+    cx.drawImage(atlas, (HAT + g) * TW * AK, 2 * HSTEP * TH * AK, TW * AK, TH * AK, (i % COLS) * GW + GW / 2 - TW / 2, Math.floor(i / COLS) * GH + GH / 2 - TH / 2, TW, TH);
     nhatch++; if (INTITLE[i] && al > tInk) tInk = al; }
   window.viz.stats = { fig: nfig / NCELL, hatch: nhatch / NCELL, titleInk: tInk, ta, chars: total };
   if (ta > 0) { cx.globalAlpha = ta * .9; cx.fillStyle = '#e6d6ad'; cx.textBaseline = 'alphabetic'; cx.textAlign = 'left';

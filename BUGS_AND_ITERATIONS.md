@@ -661,3 +661,7 @@ RSI: ~20 min, 1 still round, 1 preview render (51 s) -> top loss: two phone enco
 - Mistake: the first render attempt rendered nothing. Root cause: a `for r in "1 0:2588" ...; set -- $r` loop, which zsh does not word-split, so each part got the frame range `1 0:2588` and ffmpeg refused the output name. Caught by reading the logs before joining. Prevention: the three render commands are written out, no loop.
 
 RSI: ~8 min, 1 wasted launch (under a minute), 3 parallel parts at ~9 fps each (275-308 s) -> top loss: the zsh loop -> fix: written-out commands; render speed is bound by headless Chrome frame capture, three parts already fill the laptop's cores.
+
+**Festival Version cover (2026-11-21, Joona: "Make a neuron cover"):** `aura-neurons.html?cover` draws the middle square of the frame three times as sharp (3240 px, scaled to 3000), with no title and the neurons 1.45 times as bright so they read at thumbnail size. Frame: bar 39.9, three neurons in a triangle joined by their myelinated axons (as in his reference picture), picked from 14 candidate bars on a contact sheet, then looked at full size and at 300 px. `renders/aura-festival-cover.png/.jpg` (3000 x 3000), copied to the release folder with a 16-bit 44.1 kHz DistroKid WAV of the festival master (soxr, triangular dither). The video's layout check is still clean with the cover mode in the page.
+
+RSI: ~4 min, 2 still rounds -> top loss: the first candidates were too dim for a cover (video brightness) -> fix: the cover mode carries its own brightness, as the album cover's does.
