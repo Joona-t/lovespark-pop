@@ -123,9 +123,9 @@ const riser = s("white*16").decay(.07).sustain(0)
 // ---- the outro's air: a halo of the chords an octave up that swells slowly, and the arp opening with no acid resonance ----
 const halo = chords.add(note(12)).s("triangle").attack(1.6).decay(.5).sustain(.8).release(3)
   .gain(.06).lpf(5000).room(.9).size(.98).pan(sine.range(.3, .7).slow(8)).orbit(5)
-const airPluck = pluck(3000, 4200).add(note(12)).lpq(3)   // B: back up an octave so the ending floats.delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))
+const airPluck = pluck(3000, 4200).add(note(12)).lpq(3).gain(.55)   // B: back up an octave so the ending floats.delayfeedback(.55).room(.7).size(.95).velocity(saw.range(.85, .2).slow(16))   // even gain: the beat accent read as a pulse once the bell was gone
 
 arrange(
-  [16, stack(kick.gain(.4).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo, bell.add(note(12)).gain(.13).room(.95).size(.98),
-             soft.velocity(saw.range(1, .15).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above
+  [16, stack(kick.gain(.4).duckdepth(.25).mask("<1!8 0!8>"), bass(300, 0).mask("<1!8 0!8>"), halo,
+             soft.velocity(saw.range(1, .3).slow(16)), pad, airPluck)],   // outro (Joona: "airy and light, like the listener is flying or dreamy"): the ground falls away after 8 bars, the arp opens instead of closing, a halo above; the soft synth alone carries the melody (Joona: "the ending should be the soft synth not the bell")
 )

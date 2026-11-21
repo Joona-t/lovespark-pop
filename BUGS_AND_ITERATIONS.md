@@ -514,3 +514,10 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error in A, B, live and the preview; 0 notes outside the chord; kick 4 per bar in bars 1-8 and 0 after (stem peaks -6.0 then silent; bass -11.1 then silent). Mastered preview vs the previous ending: air 6-16 kHz -29.4 -> -20.0 dB share, low end < 120 Hz -2.5 -> -5.3 dB, beat regularity 0.77 -> 0.57, null -36.2 dB. Preview sent at -14 LUFS ("5 - airy ending").
 - **Check slip:** the first size check on the preview capture used a 4 s quiet window and caught a pause between upload chunks (26.7 of 33 s); re-checked with 10 s: 33.2 s complete.
 - RSI: 1 preview render, 2 checks -> 1 false "done" on file size -> waits use a 10 s quiet window.
+
+## ITER-054 (2026-11-21): Aura's ending carried by the soft synth; the pulse softened
+- **Asked:** "the ending should be the soft synth not the bell."
+- **Done (A, B, live, preview):** high bell removed from the outro; the soft synth alone carries the melody, fading 1 -> 0.3 (was 0.15). Double-checking after the change showed more beat pulse once the bell stopped masking it, so: the ending arp at an even level (no beat accent), and the outro's soft kick ducks only lightly (`duckdepth(.25)`).
+- **Verified:** melody bus in the ending = soft synth only (41 + 41 notes); kick and bass silent after bar 8. Pulse measured as the high band's swing within each beat: old metronome ending 45.1 dB; new bars 1-8 18.1 dB, bars 9-16 6.6 dB; high band -34.6 / -32.1 dBFS vs -22.8.
+- **Measurement correction:** the beat-lag autocorrelation used earlier is fragile for sharp clicks (one 5 ms frame of lag rounding moved the old ending from 0.97 to 0.67); the swing per beat is the measure to use for ticks.
+- RSI: 3 preview renders -> the bell's removal unmasked the arp's accent and the sidechain breathing -> after removing any part, re-run the tick measure on what is left.
