@@ -109,11 +109,9 @@ const hats = s("hh*4").bank("RolandTR909").gain(.16).hpf(8000).decay(.05).orbit(
 const open = s("[~ oh]*4").bank("RolandTR909").decay(.2).gain(.3).hpf(5000).orbit(1)
 
 // ---- drums, layer 3: percussion that never repeats inside 4 bars, and a crash at the top of each 16 ----
-const rim = s(`<[~ ~ rim ~ ~ rim ~ ~ ~ ~ rim ~ ~ ~ ~ rim] [~ ~ rim ~ ~ ~ ~ rim ~ ~ rim ~ ~ rim ~ ~]
-              [~ ~ rim ~ ~ rim ~ ~ ~ rim ~ ~ ~ ~ rim ~] [~ ~ rim ~ rim ~ ~ rim ~ ~ rim ~ rim ~ rim rim]>`)
-  .bank("RolandTR909").gain(.22).pan(.62).delay(.2).delaytime(3/16).delayfeedback(.25).orbit(1)
+const rim = silence   // removed (Joona, after previews: "1 is the best, the rim is out of place")
 const shaker = silence   // removed with the constant hats: it was a second hi-hat ticking on every 16th
-const tom = s("<~ ~ ~ [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ lt ~ mt ~ ht ht]>").bank("RolandTR909").gain(.3).room(.3).orbit(1)
+const tom = silence   // removed with the rim: preview 1 had neither
 const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.26).room(.4).orbit(1)
 
 // ---- build: a snare roll that doubles every 2 bars and a white-noise riser, both rising over 8 bars ----
@@ -133,5 +131,5 @@ arrange(
   [8, stack(roll, riser, pad, glass, soft, pluck(900, 4200)).mask("<1!7 [1 0]>")],   // build: the soft synth alone over the roll, then half a bar of silence
   [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3200, 3800))],   // drop: all three, brightest
   [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, bass(650, .46), all3, pad, glass, pluck(3800, 4400))],   // drop II: all three, the pluck opens once more
-  [16, stack(kick.gain(.5), hats.gain(.7), shaker, bass(380, .28), soft.velocity(saw.range(1, .15).slow(16)), pad, glass, pluck(2400, 300))],   // outro: only the soft synth, fading with the pluck back to air
+  [16, stack(kick.gain(.5), bass(380, .28), soft.velocity(saw.range(1, .15).slow(16)), pad, pluck(2400, 300))],   // outro: no hats (Joona: the exposed tick "sounds like someone forgot the metronome on"); kick, bass and the soft synth fade with the pluck
 )

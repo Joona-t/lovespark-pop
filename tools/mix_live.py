@@ -14,6 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("raw"); ap.add_argument("out")
 ap.add_argument("--bpm", type=float, required=True); ap.add_argument("--bars", type=int, required=True)
 ap.add_argument("--first-kick-bar", type=int, required=True, help="1-based bar of the first kick")
+ap.add_argument("--allow-silent", default="", help="comma list of stems allowed to be silent (a section preview with no drums); never for a full track")
 ap.add_argument("--music-hp", type=float, default=170, help="high-pass on the music bus in Hz; lower it for a low arp (Aura B: 80)")
 ap.add_argument("--rate", type=int, default=44100); ap.add_argument("--tail-bars", type=float, default=1.5)
 a = ap.parse_args()
@@ -54,7 +55,7 @@ if null_db > -20:
 if kick_on is None:
     sys.exit("the kick stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
 for k in LAY:
-    if peak[k] <= 0 and k != "other":            # other is empty when a track uses only orbits 1-4 and 9
+    if peak[k] <= 0 and k != "other" and k not in a.allow_silent.split(","):            # other is empty when a track uses only orbits 1-4 and 9
         sys.exit(f"the {k} stem is silent: a voice is missing from the capture (BUG-014), nothing mixed")
 
 # 2. bar 1 from the first kick, and the kick gate (a throttled page drops hits, BUG-013)

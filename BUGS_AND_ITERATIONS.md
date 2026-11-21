@@ -496,3 +496,13 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** no eval error; 320 closed hats across 152 bars, 0 not on a kick (pulse has kicks but no hats: 384 kicks); 0 shaker hits; 192 open hats.
 - **Not done:** the masters in `Bvby Ash project/Aura` (ITER-050) still have the 8-per-bar hats; a new capture and master is needed for them.
 - RSI: 1 edit across 3 files, 1 check -> nothing lost -> none needed.
+
+## ITER-052 (2026-11-21): rim and toms out, metronome tick removed from the outro; music theory reference
+- **Asked:** three drop previews -> "1 is the best, the rim is out of place"; "the ticking at the end of the last master was horrendous ... sounds like someone forgot the metronome on while recording"; "always double check"; "Make sure your master and mix is good"; "Go research some music theory ... just for more reference."
+- **Done (A, B, live):** rim and tom fills removed (preview 1 had neither). Outro: no hats, no glass blips; kick, bass, soft synth, pad, pluck fade out.
+- **Root cause of the tick:** in the ITER-050 master the outro kept 8-per-bar hats and the 16th-note shaker while the music faded, so the drum bus's top end rose 5.5 dB above the groove (-42 vs -47.5 dB) with regular spacing. Measured on the stems.
+- **Double check (outro preview, 16 bars, mastered):** top end above 4 kHz -22.8 -> -34.8 dBFS; beat regularity 0.97 (metronome) -> 0.73; what remains is the pluck's accented arp (-46 dBFS, 0.81) and sidechain breathing on the pad (-62 dBFS), the kick's click at -59.8 dBFS; drums bus silent. Sent as "4 - ending, no tick.mp3".
+- **Mixer:** `--allow-silent <stems>` for section previews (the outro has no drums); without it the BUG-014 guard still refuses (checked).
+- **Stopped and discarded:** two full captures (rim still in), two more (old outro). Nothing re-rendered until the ending is approved.
+- **Research:** `research/music-theory.md` (groove and syncopation, build-ups and drops, texture over harmony, modal mixture, expectation).
+- RSI: 4 full captures discarded -> sound changes were going to full renders before a preview -> preview the changed section first, measure it, then render.
