@@ -379,3 +379,15 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Check mistake caught:** the first two checks queried cycles 0 to 4 and still showed the old pattern, because launch quantization (`// @q 4`) keeps the old pattern for every cycle before the switch point. A live check must query from the scheduler's current cycle onward (`scheduler.now()`), never from cycle 0.
 - **Not verified:** how it sounds; his call.
 - RSI: 1 save, 4 checks (2 wasted on the cycle-0 query) -> the wasted checks -> query from `scheduler.now()` from here on.
+
+## ITER-039 (2026-11-21): track 12 third start, deadmau5 x John Summit with a melody and a 16-bar progression
+- **Asked:** "Go back for the dead mouse. I think dead mouse and john summit. Synth melody, progression, and get rid of the boring repetition", plus a pasted brief on both artists (mau5: detuned saw pluck, patience, chords borrowed from the parallel major; Summit: rolling tech-house bass under a soaring melodic hook). The Ganacci bounce (ITER-038) is gone from the live file; it stays in git at 9fd8f0c.
+- **Done:** 127 BPM, G minor, four parts (kick, bass, pluck, lead), no hats or clap yet.
+  - Progression, 16 bars, 2 bars a chord: Gm9, Ebmaj9, Bbmaj9, Fsus4 -> F, then Cmaj9 (borrowed from G major, the bittersweet lift), Ebmaj9, Bb/D, Dsus4 -> D major (leads home).
+  - Melody, 16 bars, no bar repeated: bars 1 to 8 ask, bars 9 to 16 answer higher and land on F# over the D major.
+  - Bass: Summit-style 16ths off the kick, follows every chord, two rhythms alternating, fills on root, fifth and octave.
+  - Pluck: the Slow Light pluck, two rhythms alternating, filter breathing over the 16 bars.
+- **Bug caught before commit:** the first bass fills used -2 and +3 semitone offsets, which gave Gb over Eb and Ab over Bb (outside G minor). Found by checking every bass note against its bar's chord; fills now use only root, fifth, octave. After the fix: 112 bass notes in 16 bars, all in key (the only non-chord tone is A over Bb/D, the major 7th).
+- **Verified:** live page playing, no eval or console error, cps 0.529 (127 BPM); per 16 bars: 64 kicks, 112 sub + 112 saw bass notes, 44 lead notes, 16 of 16 lead bars distinct, 14 of 16 bass bars distinct. Queried from the scheduler's current cycle (ITER-038 lesson).
+- **Not verified:** how it sounds; his call.
+- RSI: 2 saves, 2 checks -> 1 save spent on out-of-key fills -> note-against-chord check now run on the first save of any bass or melody.
