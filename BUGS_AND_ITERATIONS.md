@@ -371,3 +371,11 @@ RSI: ~12 min, 1 capture, 1 render -> top loss: one cancelled capture when the fi
 - **Verified:** live page playing, no eval error, cps 0.529 (127 BPM); per 2 bars: 8 kicks (orbit 9), 14 sub + 14 saw notes (orbit 3), first notes G1 on 16ths 1, 3, 6, 9.
 - **Not verified:** how it sounds. No audio measurement at this stage; that is his call.
 - RSI: 1 save, 1 check -> nothing lost -> none needed.
+
+## ITER-038 (2026-11-21): track 12 restarted, Salvatore Ganacci-style bounce
+- **Asked:** "more Salvatore Ganacci now. Let's scrap this one." The Summit-style rolling bass (ITER-037) is gone from `patterns/live.strudel.js`; it stays in git at 5f5cbc8.
+- **Done:** 126 BPM, A minor, still only two parts. A 909 kick and one off-beat "donk" that is bass and hook at once: 4 bars of 16ths, octave jumps, a small fill at the end of each bar (FM sine with a pitch drop into every note via `penv`, plus a hollow square an octave up).
+- **Verified:** live page playing, no eval or console error, cps 0.525 (126 BPM); per 4 bars: 16 kicks (orbit 9), 27 donk + 27 square notes (orbit 3); bar 1 = A1 on 16ths 2, 6, 10, A2 on 7, 13, then G2, E2.
+- **Check mistake caught:** the first two checks queried cycles 0 to 4 and still showed the old pattern, because launch quantization (`// @q 4`) keeps the old pattern for every cycle before the switch point. A live check must query from the scheduler's current cycle onward (`scheduler.now()`), never from cycle 0.
+- **Not verified:** how it sounds; his call.
+- RSI: 1 save, 4 checks (2 wasted on the cycle-0 query) -> the wasted checks -> query from `scheduler.now()` from here on.
