@@ -1,8 +1,11 @@
 // 12 (untitled) · deadmau5 x John Summit, 128 BPM, E minor
-// Restart (2026-11-21): the synths alone first, as with Slow Light. The synths carry the emotion; drums and bass wait.
+// Restart (2026-11-21): the synths first, as with Slow Light. Joona on the synths: "this is it".
+// Arrangement (his call): open airy and ethereal on the synths alone for a minute, then layer the drums in as the energy rises.
+// Sections, 16 bars each (one pass of the progression): air · bloom · pulse · groove · full
 // From Joona's brief: the detuned saw pluck, patience, chords borrowed from the parallel major for a bittersweet lift.
 // (Scrapped today: a Summit bass loop, a Ganacci bounce, and a first mau5 x Summit sketch.)
 // @q 4
+// @top
 setcpm(128/4)
 
 // ---- harmony: 16 bars, voiced so the top note barely moves ----
@@ -14,14 +17,15 @@ const chords = note(`<
   [e3,gs3,b3,e4,fs4]!2  [c3,g3,b3,d4,e4]!2   [a3,c4,e4,g4,b4]!2    [b3,e4,fs4,a4] [b3,ds4,fs4,a4]>`)
 
 // ---- 1. the mau5 pluck: arpeggiated through each chord, two detuned saws, resonant ladder filter ----
-// Each note's filter snaps shut (lpenv + short lpdecay): the pluck. The base cutoff opens and closes over 32 bars.
+// Each note's filter snaps shut (lpenv + short lpdecay): the pluck. The base cutoff opens section by section.
 // Two arp shapes alternate every 2 bars so the line keeps changing; the gains pump like a sidechain with no kick.
 const arpShape = `<
   [0 1 2 3 4 3 2 1 0 1 2 3 4 3 2 1]
   [0 2 4 2 1 3 4 3 0 2 4 3 1 2 4 2]>`
-const pluck = chords.arp(arpShape)
+// lo..hi: the cutoff at the start and end of a 16-bar section
+const pluck = (lo, hi) => chords.arp(arpShape)
   .s("sawtooth").unison(2).detune(.12)
-  .lpf(sine.range(500, 2300).slow(32)).lpq(8).ftype("ladder")
+  .lpf(saw.range(lo, hi).slow(16)).lpq(8).ftype("ladder")
   .lpattack(.001).lpenv(4).lpdecay(.12).lpsustain(0)
   .attack(.001).decay(.22).sustain(0).release(.05)
   .gain("[.75 .42 .58 .42]*4")
@@ -39,4 +43,29 @@ const pad = chords.s("sawtooth").unison(5).detune(.28)
   .lpf(saw.range(600, 2600).slow(16)).lpq(1)
   .gain(.16).room(.85).size(.95).orbit(5)
 
-stack(pluck, glass, pad)
+// ---- drums, layer 1: the kick. 909, four on the floor, ducks the pluck and the pad so the synths breathe with it ----
+const kick = s("bd*4").bank("RolandTR909").shape(.2).gain(.62)
+  .orbit(9).duckorbit("2:5").duckattack(.2).duckdepth(.7)
+
+// ---- drums, layer 2: Summit's groove. Clap on 2 and 4, shuffled 16th hats, open hat on every off-beat ----
+const clap = s("~ cp ~ cp").bank("RolandTR909").room(.22).size(.4).gain(.5).orbit(1)
+const hats = s("hh*16").bank("RolandTR909").swingBy(1/7, 8)
+  .gain("[.16 .3 .22 .34]*4").hpf(7000).pan(sine.range(.4, .6).fast(2)).orbit(1)
+const open = s("[~ oh]*4").bank("RolandTR909").decay(.2).gain(.3).hpf(5000).orbit(1)
+
+// ---- drums, layer 3: percussion that never repeats inside 4 bars, and a crash at the top of each 16 ----
+const rim = s(`<[~ ~ rim ~ ~ rim ~ ~ ~ ~ rim ~ ~ ~ ~ rim] [~ ~ rim ~ ~ ~ ~ rim ~ ~ rim ~ ~ rim ~ ~]
+              [~ ~ rim ~ ~ rim ~ ~ ~ rim ~ ~ ~ ~ rim ~] [~ ~ rim ~ rim ~ ~ rim ~ ~ rim ~ rim ~ rim rim]>`)
+  .bank("RolandTR909").gain(.22).pan(.62).delay(.2).delaytime(3/16).delayfeedback(.25).orbit(1)
+const shaker = s("~ hh ~ hh").fast(4).bank("RolandTR808").gain("[.08 .14]*8").hpf(9000).pan(.36).orbit(1)
+const tom = s("<~ ~ ~ [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ lt ~ mt ~ ht ht]>").bank("RolandTR909").gain(.3).room(.3).orbit(1)
+const crash = s("<cr ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~>").bank("RolandTR909").gain(.26).room(.4).orbit(1)
+
+// ---- the arrangement: 80 bars. The synths hold the room alone, then the drums arrive one by one ----
+arrange(
+  [16, stack(pad, glass.gain(.07), pluck(300, 700).gain(.6))],                           // air: pad, a whisper of pluck
+  [16, stack(pad, glass, pluck(700, 1400))],                                             // bloom: the pluck opens, still no drums
+  [16, stack(kick.gain(.42), shaker, pad, glass, pluck(1400, 1900))],                    // pulse: a soft kick and the shaker
+  [16, stack(kick.gain(.54), clap, hats, rim, tom, pad, glass, pluck(1900, 2400))],      // groove: clap, shuffled hats, rims
+  [16, stack(kick, clap, hats, open, rim, shaker, tom, crash, pad, glass, pluck(2400, 3000))], // full: everything
+)
